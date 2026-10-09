@@ -1,0 +1,21 @@
+# Raw Olist data (download from Kaggle; see README / check_data.py)
+*.csv
+
+# Python / environments
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.env
+
+# Local tooling
+.claude/
+CLAUDE.md
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# NOTE: dashboard/data/*.parquet is intentionally tracked (small, pre-aggregated).
