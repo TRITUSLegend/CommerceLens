@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "CommerceLens"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "da72f1dc-310b-426b-9c7d-b3464ceef4d7"
+  }
+}

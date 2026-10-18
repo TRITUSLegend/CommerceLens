@@ -9,8 +9,8 @@ table dim_state
 
 	column state_name
 		dataType: string
-		dataCategory: StateOrProvince
 		lineageTag: 44993247-c7c6-54ba-910b-8c6f55d88bc5
+		dataCategory: StateOrProvince
 		summarizeBy: none
 		sourceColumn: state_name
 

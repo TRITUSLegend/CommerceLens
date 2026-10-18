@@ -1,6 +1,6 @@
 table dim_date
-	dataCategory: Time
 	lineageTag: 86208b1f-e4e6-5f12-848b-9fb170235265
+	dataCategory: Time
 
 	column date
 		dataType: dateTime
@@ -9,6 +9,8 @@ table dim_date
 		lineageTag: 0f2e8d42-be04-5185-a961-8273eed10baa
 		summarizeBy: none
 		sourceColumn: date
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column year
 		dataType: int64
@@ -48,6 +50,8 @@ table dim_date
 		lineageTag: b5fa5cff-4b10-5cbf-b0c2-cc22fb09c215
 		summarizeBy: none
 		sourceColumn: month_start
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column is_partial_edge
 		dataType: boolean

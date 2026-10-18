@@ -1,15 +1,6 @@
 table _Measures
 	lineageTag: b3314d8f-823d-5399-ba5f-d94323e1bc86
 
-	column Placeholder
-		dataType: int64
-		formatString: 0
-		isHidden
-		lineageTag: 2cf7a959-9c03-5feb-8787-8c22af3b0d42
-		summarizeBy: none
-		isNameInferred
-		sourceColumn: [Placeholder]
-
 	measure 'Total Orders' = COUNTROWS ( fact_orders )
 		formatString: #,0
 		displayFolder: 1 Core
@@ -410,6 +401,16 @@ table _Measures
 		displayFolder: 8 Model
 		lineageTag: 106f1771-b66c-5dfe-b1d2-c9fd34c1b1ce
 
+	column Placeholder
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 2cf7a959-9c03-5feb-8787-8c22af3b0d42
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Placeholder]
+
 	partition _Measures = calculated
 		mode: import
 		source = ROW ( "Placeholder", 0 )
+

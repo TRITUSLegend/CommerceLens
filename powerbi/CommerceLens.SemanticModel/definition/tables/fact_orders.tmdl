@@ -29,11 +29,13 @@ table fact_orders
 
 	column purchase_date
 		dataType: dateTime
-		formatString: yyyy-mm-dd
 		isHidden
+		formatString: yyyy-mm-dd
 		lineageTag: 20767a2b-e6d3-5aba-b300-be992a374e09
 		summarizeBy: none
 		sourceColumn: purchase_date
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column estimated_delivery_date
 		dataType: dateTime
@@ -42,12 +44,16 @@ table fact_orders
 		summarizeBy: none
 		sourceColumn: estimated_delivery_date
 
+		annotation UnderlyingDateTimeDataType = Date
+
 	column delivered_date
 		dataType: dateTime
 		formatString: yyyy-mm-dd
 		lineageTag: d82d3d80-b742-5040-a290-12873c171fa1
 		summarizeBy: none
 		sourceColumn: delivered_date
+
+		annotation UnderlyingDateTimeDataType = Date
 
 	column items_value
 		dataType: double
