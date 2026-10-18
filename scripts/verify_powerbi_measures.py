@@ -18,6 +18,7 @@ Model.masks), then the results are compared with the SQL layer:
                                        D8 Streamlit what-if, D9 sql/09 RFM segments,
                                        D10 Model page lookups on the copied model tables,
                                        D11 sql/17 seller tiers
+    E  Lane lead time (Stage 6)        pandas re-derivation of sql/22 from the star schema
 
 A pass in B, C or D means the measure's LOGIC (filters, scope flags, relationships)
 reproduces SQL. The DAX itself is not executed, so those measures are
@@ -601,6 +602,48 @@ def section_d10_model_page() -> None:
     check("D10", "rows matched by the stratified-test filter", len(test), 1, 0, "LOGIC-CHECKED")
 
 
+def section_e_lane_lead_time(model: Model) -> None:
+    """Stage 6: re-derive lane_lead_time (sql/22) in pandas from the star schema, without
+    reusing any SQL logic: lane from fact_order_items + dim_seller, percentiles as the
+    smallest d with share(delivery_days <= d) >= q. Both are run here, so VERIFIED."""
+    fo = model.t["fact_orders"]
+    items = model.t["fact_order_items"].merge(model.t["dim_seller"][["seller_id", "seller_state"]], on="seller_id")
+    states = items.groupby("order_id")["seller_state"].agg(["nunique", "first"])
+    lane_of = states.loc[states["nunique"] == 1, "first"]
+    o = fo[fo["in_delay_scope"] == 1].copy()
+    o["seller_state"] = o["order_id"].map(lane_of)
+    o = o.dropna(subset=["seller_state"])
+    o["promised_days"] = (pd.to_datetime(o["estimated_delivery_date"]) - pd.to_datetime(o["purchase_date"])).dt.days
+
+    def shortest_promise(days: pd.Series, q: float) -> float:
+        s = np.sort(days.to_numpy())
+        share = np.searchsorted(s, s, side="right") / len(s)      # share(delivery_days <= d)
+        return float(s[share >= q].min())
+
+    sql = pd.read_parquet(PBI / "lane_lead_time.parquet").set_index(["seller_state", "customer_state"])
+    lanes = o.groupby(["seller_state", "customer_state"])
+    sizes = lanes.size()
+    check("E", "lanes with 30+ orders", int((sizes >= 30).sum()), len(sql), 0, "VERIFIED")
+    for key, g in lanes:
+        if len(g) < 30:
+            continue
+        lane = f"{key[0]} -> {key[1]}"
+        r = sql.loc[key]
+        p90, p95 = shortest_promise(g["delivery_days"], 0.90), shortest_promise(g["delivery_days"], 0.95)
+        values = {
+            "orders": (len(g), r["orders"], 0),
+            "p50_delivery_days": (shortest_promise(g["delivery_days"], 0.50), r["p50_delivery_days"], 0),
+            "p90_delivery_days": (p90, r["p90_delivery_days"], 0),
+            "p95_delivery_days": (p95, r["p95_delivery_days"], 0),
+            "avg_promised_days": (g["promised_days"].mean(), r["avg_promised_days"], 0.05 + 1e-6),
+            "on_time_pct_today": (100 * (g["delay_days"] <= 0).mean(), r["on_time_pct_today"], HALF_2DP),
+            "on_time_pct_at_p95": (100 * (g["delivery_days"] <= p95).mean(), r["on_time_pct_at_p95"], HALF_2DP),
+            "gap_p95_vs_avg_promise_days": (p95 - g["promised_days"].mean(), r["gap_p95_vs_avg_promise_days"], 0.05 + 1e-6),
+        }
+        for col, (value, expected, tol) in values.items():
+            check("E", f"{lane}: {col}", value, expected, tol, "VERIFIED")
+
+
 def round_half_up(x: float) -> int:
     """Power BI's '#,0' format rounds halves away from zero; Python's format rounds to even."""
     return int(math.floor(x + 0.5))
@@ -658,6 +701,7 @@ SECTION_TITLES = {
     "D9": "D9 RFM segments  [sql/09 -> rfm_segments]",
     "D10": "D10 Model page lookups  [copied model_* tables vs dashboard/data/model_capture]",
     "D11": "D11 Seller tiers  [sql/17 -> seller_tiers]",
+    "E":  "E  Stage 6 lane lead time: pandas re-derivation vs sql/22 (lane_lead_time)",
 }
 SHOW_ALL_ROWS = {"A", "B", "D8"}       # other sections print a one-line summary when all match
 
@@ -697,6 +741,7 @@ def main() -> int:
     section_c_propagation(dax)
     section_d_report_pages(dax)
     section_d10_model_page()
+    section_e_lane_lead_time(dax.m)
     ok = report()
     pitfall_demos(dax)
     return 0 if ok else 1

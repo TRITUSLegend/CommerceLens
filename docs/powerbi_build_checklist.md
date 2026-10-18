@@ -8,7 +8,7 @@ Before you start (PowerShell, repo root):
 
 ```powershell
 .venv-powerbi\Scripts\python scripts/build_powerbi_data.py       # must end with "All checks passed."
-.venv-powerbi\Scripts\python scripts/verify_powerbi_measures.py  # must end with "919/919 checks match."
+.venv-powerbi\Scripts\python scripts/verify_powerbi_measures.py  # must end with "N/N checks match." (1912/1912 now)
 ```
 
 **Shortcut:** `powerbi/README.md` describes opening the generated TMDL model (tables, relationships,
@@ -33,10 +33,10 @@ it, build by hand from step 1. Either way, steps 6 onward are the same.
       ```
       In the Query Settings pane, rename the query `fact_orders`.
 - [ ] Right-click `fact_orders` > **Duplicate**; in the Advanced Editor change the file name; rename.
-      Repeat until there are 15 queries: `fact_orders`, `fact_order_items`, `dim_customer`,
+      Repeat until there are 16 queries: `fact_orders`, `fact_order_items`, `dim_customer`,
       `dim_product`, `dim_seller`, `dim_state`, `dim_date`, `recon_sql`, `recon_seller_state`,
-      `model_metrics`, `model_capture_curve`, `shap_importance`, `shap_state_effect`, `model_curves`,
-      `model_target_comparison`.
+      `lane_lead_time` (optional page), `model_metrics`, `model_capture_curve`, `shap_importance`,
+      `shap_state_effect`, `model_curves`, `model_target_comparison`.
 - [ ] Spot-check types (icon in each column header): dates show the calendar icon
       (`purchase_date`, `dim_date[date]`), `price` / `items_value` show 1.2 (decimal), flags such as
       `is_delivered` show 123 (whole number). Parquet carries the types, so no change should be needed.
@@ -59,7 +59,8 @@ it, build by hand from step 1. Either way, steps 6 onward are the same.
       | fact_orders | customer_state | dim_state | state_code |
       | fact_orders | purchase_date | dim_date | date |
 
-- [ ] Confirm: no relationship touches `recon_sql`, `recon_seller_state` or the six model tables.
+- [ ] Confirm: no relationship touches `recon_sql`, `recon_seller_state`, `lane_lead_time` or the six
+      model tables.
 
 ## 3. Date table
 
@@ -225,3 +226,13 @@ typed. The measures per finding are listed in `docs/powerbi_requirements_map.md`
 ### 7. Reconciliation
 
 As built in step 6.
+
+### 8. Lead time (optional, exploratory; see `docs/lead_time_by_lane.md`)
+
+| Visual | Fields / measures | Filters and settings |
+|---|---|---|
+| Table | all columns of `lane_lead_time` | Sort by `orders` descending |
+| Bar: promise gap | Y `lane_lead_time[lane]`, X `gap_p95_vs_avg_promise_days` | Visual filter `orders` >= 200; sort descending; colour orange only where the gap is above 0 (fx > Rules: value > 0 → `#eb6834`, else `#2a78d6`) |
+| Slicers | `lane_lead_time[seller_state]`, `lane_lead_time[customer_state]` | — |
+
+Title the page "Lead time (exploratory)"; it is not part of the README findings yet.

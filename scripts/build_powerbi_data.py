@@ -19,6 +19,7 @@ Tables
     recon_sql         headline numbers computed by the SQL layer, for the
                       Power BI reconciliation page (DAX vs SQL)
     recon_seller_state  sql/21 output, the SQL reference for the seller-state measures
+    lane_lead_time    sql/22 output: delivery-time percentiles and promise gaps by lane
     model_*, shap_*   Model page tables, copied unchanged from dashboard/data/
                       (built by scripts/build_dashboard_data.py; nothing is retrained here)
 """
@@ -335,6 +336,7 @@ def main() -> int:
     t["dim_date"] = save(build_dim_date(purchase_dates, monthly), "dim_date")
     recon = save(build_recon(con), "recon_sql")
     save(db.query(con, "21_seller_state_ops.sql"), "recon_seller_state")
+    save(db.query(con, "22_lane_lead_time.sql"), "lane_lead_time")   # Stage 6, optional page
     copy_model_files()
 
     print("\nIntegrity checks")

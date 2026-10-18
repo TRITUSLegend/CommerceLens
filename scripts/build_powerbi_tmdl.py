@@ -37,7 +37,7 @@ OUT = ROOT / "powerbi" / "CommerceLens.SemanticModel" / "definition"
 
 # Tables loaded from parquet, in display order.
 TABLES = ["fact_orders", "fact_order_items", "dim_customer", "dim_product", "dim_seller",
-          "dim_state", "dim_date", "recon_sql", "recon_seller_state", "model_metrics",
+          "dim_state", "dim_date", "recon_sql", "recon_seller_state", "lane_lead_time", "model_metrics",
           "model_capture_curve", "shap_importance", "shap_state_effect", "model_curves",
           "model_target_comparison"]
 
@@ -72,7 +72,8 @@ HIDDEN = {
 # Fact and dimension numbers are only shown through measures; the Model page tables
 # are pre-aggregated, so their numeric columns keep a default sum.
 NO_IMPLICIT_SUM = {"fact_orders", "fact_order_items", "dim_customer", "dim_product",
-                   "dim_seller", "dim_state", "dim_date", "recon_sql", "recon_seller_state"}
+                   "dim_seller", "dim_state", "dim_date", "recon_sql", "recon_seller_state",
+                   "lane_lead_time"}
 
 ARROW_TO_TMDL = {"string": "string", "large_string": "string", "double": "double", "float": "double",
                  "int64": "int64", "int32": "int64", "bool": "boolean", "date32[day]": "dateTime"}

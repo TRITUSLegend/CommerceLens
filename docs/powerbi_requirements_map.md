@@ -7,8 +7,8 @@ page that show it, today's value and the recommended action.
 - **Values** come from the SQL outputs named in brackets (`dashboard/data/*.parquet`, built from
   `sql/`). None are typed into Power BI: the report computes them with the measures listed.
 - **Measures** are defined in [`powerbi/dax_measures.md`](../powerbi/dax_measures.md). Each one is
-  LOGIC-CHECKED against its SQL file by `scripts/verify_powerbi_measures.py` (919/919 checks
-  match); none has been executed in Power BI Desktop yet.
+  LOGIC-CHECKED against its SQL file by `scripts/verify_powerbi_measures.py` (all 905 measure
+  checks match); none has been executed in Power BI Desktop yet.
 - **Pages** refer to the build guide in [`powerbi_build_checklist.md`](powerbi_build_checklist.md).
 
 | # | Business question | Measures (`_Measures` table) | Visual (page) | Value now [source] | Recommended action |
