@@ -1,0 +1,4 @@
+expression DataFolder = "REPLACE_WITH_FULL_PATH_TO\powerbi\data\" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 0dbda07a-98a2-59b2-b892-463a42d24924
+
+	annotation PBI_ResultType = Text

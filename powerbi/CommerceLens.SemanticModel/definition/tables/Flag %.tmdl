@@ -1,0 +1,14 @@
+table 'Flag %'
+	lineageTag: a6f26618-2313-53ae-aec1-9edeb8c44145
+
+	column 'Flag %'
+		dataType: int64
+		formatString: 0
+		lineageTag: 9218cae7-7747-5a64-bfd6-797f651a6ed3
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Flag %]
+
+	partition 'Flag %' = calculated
+		mode: import
+		source = SELECTCOLUMNS ( GENERATESERIES ( 1, 100, 1 ), "Flag %", [Value] )

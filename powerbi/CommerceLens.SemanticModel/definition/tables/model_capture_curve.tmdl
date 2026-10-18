@@ -1,0 +1,35 @@
+table model_capture_curve
+	lineageTag: 390326b7-8f9a-5bcf-9d7d-1398a7882422
+
+	column top_frac
+		dataType: double
+		lineageTag: 6844800c-eb58-5e00-972c-6db8d717fab3
+		summarizeBy: sum
+		sourceColumn: top_frac
+
+	column precision_at_top
+		dataType: double
+		lineageTag: 4044f6de-fda7-506d-8db2-5fcdadb3e72c
+		summarizeBy: sum
+		sourceColumn: precision_at_top
+
+	column recall_at_top
+		dataType: double
+		lineageTag: f3ca9c7f-e9c1-5af3-b3e3-ab950a6062ca
+		summarizeBy: sum
+		sourceColumn: recall_at_top
+
+	column lift_vs_random
+		dataType: double
+		lineageTag: 765d257c-21c1-55e4-86a1-b6cdcd16eedc
+		summarizeBy: sum
+		sourceColumn: lift_vs_random
+
+	partition model_capture_curve = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "model_capture_curve.parquet"))
+				in
+				    Source
+

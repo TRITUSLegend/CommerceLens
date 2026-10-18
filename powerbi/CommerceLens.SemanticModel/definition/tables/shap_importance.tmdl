@@ -1,0 +1,23 @@
+table shap_importance
+	lineageTag: 8920de0f-0331-5101-b564-9ffb105a6e89
+
+	column feature
+		dataType: string
+		lineageTag: 550e03b3-d339-58bb-b632-9fbade2c904c
+		summarizeBy: none
+		sourceColumn: feature
+
+	column mean_abs_shap
+		dataType: double
+		lineageTag: 5d1e33a3-44ef-51e4-b125-13fe629ba1e8
+		summarizeBy: sum
+		sourceColumn: mean_abs_shap
+
+	partition shap_importance = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "shap_importance.parquet"))
+				in
+				    Source
+

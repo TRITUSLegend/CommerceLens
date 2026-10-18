@@ -1,0 +1,389 @@
+table _Measures
+	lineageTag: b3314d8f-823d-5399-ba5f-d94323e1bc86
+
+	column Placeholder
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 2cf7a959-9c03-5feb-8787-8c22af3b0d42
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Placeholder]
+
+	measure 'Total Orders' = COUNTROWS ( fact_orders )
+		formatString: #,0
+		displayFolder: 1 Core
+		lineageTag: 5efa67cc-08a1-5e27-b88d-affee0bcaa43
+
+	measure 'Delivered Orders' = CALCULATE ( COUNTROWS ( fact_orders ), fact_orders[is_delivered] = 1 )
+		formatString: #,0
+		displayFolder: 1 Core
+		lineageTag: 520c7123-864c-54b3-95e4-5c37a217c1d1
+
+	measure Revenue = CALCULATE ( SUM ( fact_order_items[price] ), fact_orders[is_delivered] = 1 )
+		formatString: #,0.00
+		displayFolder: 1 Core
+		lineageTag: 16a8d993-f4e6-597f-a8e6-e81477062569
+
+	measure AOV = CALCULATE ( AVERAGE ( fact_orders[items_value] ), fact_orders[is_delivered] = 1 )
+		formatString: #,0.00
+		displayFolder: 1 Core
+		lineageTag: 35653a71-1c5e-5177-b834-1c8d309e884d
+
+	measure Customers = CALCULATE ( DISTINCTCOUNT ( fact_orders[customer_unique_id] ), fact_orders[is_delivered] = 1 )
+		formatString: #,0
+		displayFolder: 1 Core
+		lineageTag: 2fbea559-0d6f-5900-a419-80bd9fac14eb
+
+	measure 'Repeat Customer %' =
+			VAR _cust =
+			    CALCULATETABLE ( VALUES ( fact_orders[customer_unique_id] ), fact_orders[is_delivered] = 1 )
+			VAR _n =
+			    ADDCOLUMNS (
+			        _cust,
+			        "@orders", CALCULATE ( COUNTROWS ( fact_orders ), fact_orders[is_delivered] = 1 )
+			    )
+			RETURN
+			    DIVIDE ( COUNTROWS ( FILTER ( _n, [@orders] >= 2 ) ), COUNTROWS ( _n ) )
+		formatString: 0.00%
+		displayFolder: 1 Core
+		lineageTag: e96ffd1e-1eb2-534d-bc88-7393b46eb63a
+
+	measure 'Avg Review' = CALCULATE ( AVERAGE ( fact_orders[review_score] ), fact_orders[is_delivered] = 1 )
+		formatString: 0.000
+		displayFolder: 1 Core
+		lineageTag: 9dc90e31-4407-55b0-8c56-ff4c399a376b
+
+	measure 'Late %' = CALCULATE ( AVERAGE ( fact_orders[is_late] ), fact_orders[in_delay_scope] = 1 )
+		formatString: 0.00%
+		displayFolder: 1 Core
+		lineageTag: 3ac2fd8a-dfc5-55d0-9d82-1697659fb9c5
+
+	measure 'Late % (reviewed)' = CALCULATE ( AVERAGE ( fact_orders[is_late] ), fact_orders[in_review_scope] = 1 )
+		formatString: 0.00%
+		displayFolder: 1 Core
+		lineageTag: 85e8629e-dddf-5af4-8cf2-e465cf63048d
+
+	measure 'Low Review %' = CALCULATE ( AVERAGE ( fact_orders[is_low_review] ), fact_orders[in_review_scope] = 1 )
+		formatString: 0.00%
+		displayFolder: 1 Core
+		lineageTag: 83ff8d86-9ecb-5e8a-9647-5d39d7537a65
+
+	measure 'Low Review % (Late)' = CALCULATE ( [Low Review %], fact_orders[is_late] = 1 )
+		formatString: 0.00%
+		displayFolder: 1 Core
+		lineageTag: 3ff322ca-58eb-5fab-8217-e6ae024b2138
+
+	measure 'Low Review % (On time)' = CALCULATE ( [Low Review %], fact_orders[is_late] = 0 )
+		formatString: 0.00%
+		displayFolder: 1 Core
+		lineageTag: 423ae295-72b2-505c-9f7f-fa3c78ebd42d
+
+	measure 'SQL Value' = SELECTEDVALUE ( recon_sql[sql_value] )
+		formatString: #,0.000###
+		displayFolder: 2 Reconciliation
+		lineageTag: 8cb501b1-af7f-5900-a8d9-ce5854e154cf
+
+	measure Tolerance = SELECTEDVALUE ( recon_sql[tolerance] )
+		formatString: #,0.000###
+		displayFolder: 2 Reconciliation
+		lineageTag: d0f5f049-1d01-54ae-9fc0-734bc0078979
+
+	measure 'DAX Value' =
+			VAR _m = SELECTEDVALUE ( recon_sql[metric] )
+			RETURN
+			    SWITCH (
+			        _m,
+			        "Total orders (all statuses)",       [Total Orders],
+			        "Delivered orders",                  [Delivered Orders],
+			        "Revenue (R$)",                      [Revenue],
+			        "Average order value (R$)",          [AOV],
+			        "Customers (1+ delivered order)",    [Customers],
+			        "Repeat customers (%)",              [Repeat Customer %] * 100,
+			        "Average review score",              [Avg Review],
+			        "Late (%) - all delivered orders",   [Late %] * 100,
+			        "Late (%) - reviewed orders only",   [Late % (reviewed)] * 100,
+			        "Low-review (%) - late orders",      [Low Review % (Late)] * 100,
+			        "Low-review (%) - on-time orders",   [Low Review % (On time)] * 100,
+			        "Late (%) - RJ",                     CALCULATE ( [Late %], dim_state[state_code] = "RJ" ) * 100,
+			        "Late (%) - SP",                     CALCULATE ( [Late %], dim_state[state_code] = "SP" ) * 100,
+			        "Champions - share of revenue (%)",
+			            DIVIDE (
+			                CALCULATE ( [Revenue], dim_customer[segment] = "Champions" ),
+			                CALCULATE ( [Revenue], ALL ( dim_customer ) )
+			            ) * 100,
+			        BLANK ()
+			    )
+		formatString: #,0.000###
+		displayFolder: 2 Reconciliation
+		lineageTag: 3877f1af-2faa-5eb7-a0b1-19163a53a0fb
+
+	measure Diff = ABS ( [DAX Value] - [SQL Value] )
+		formatString: #,0.000###
+		displayFolder: 2 Reconciliation
+		lineageTag: 36a1882c-4b23-54d9-ba34-1c6eedd3b2ed
+
+	/// Only for a single metric row. Without HASONEVALUE the total row compares
+	/// BLANK <= BLANK, which is TRUE in DAX, and shows "Match". A blank DAX Value
+	/// is a failure, not a pass.
+	measure Status =
+			IF (
+			    HASONEVALUE ( recon_sql[metric] ),
+			    IF ( NOT ISBLANK ( [DAX Value] ) && [Diff] <= [Tolerance], "Match", "Mismatch" )
+			)
+		displayFolder: 2 Reconciliation
+		lineageTag: 40839a14-43a2-5896-9ea8-5d8b538c2ac7
+
+	measure 'Checks Passed' = COUNTROWS ( FILTER ( recon_sql, [Status] = "Match" ) )
+		formatString: #,0
+		displayFolder: 2 Reconciliation
+		lineageTag: 69f11a02-9b13-56ad-8d15-475ea2bb82cb
+
+	measure 'Checks Total' = COUNTROWS ( recon_sql )
+		formatString: #,0
+		displayFolder: 2 Reconciliation
+		lineageTag: 59fdb1f7-d2db-5170-8bca-2a1a13210264
+
+	measure 'Revenue Share' = DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( dim_product ) ) )
+		formatString: #,0.00
+		displayFolder: 3 Revenue
+		lineageTag: 2dd6c9e2-633e-5288-b5e5-23d1af554650
+
+	measure 'Category Rank' =
+			IF (
+			    HASONEVALUE ( dim_product[category] ) && NOT ISBLANK ( [Revenue] ),
+			    RANKX ( ALL ( dim_product[category] ), [Revenue], , DESC, SKIP )
+			)
+		formatString: #,0
+		displayFolder: 3 Revenue
+		lineageTag: df8c552c-3a5c-5b6d-b7e0-12edfa04830a
+
+	/// Pareto curve. ALL (not ALLSELECTED) keeps the curve over all categories, as in
+	/// sql/03, even when the visual shows only the top 15. [Revenue] inside ADDCOLUMNS
+	/// is a measure, so each category row becomes a filter (context transition); a bare
+	/// SUM ( fact_order_items[price] ) there would give every row the grand total.
+	/// A category with BLANK @rev fails ">= _cur" and SUMX skips it.
+	measure 'Cumulative Revenue %' =
+			VAR _cur = [Revenue]
+			VAR _cats =
+			    ADDCOLUMNS ( ALL ( dim_product[category] ), "@rev", [Revenue] )
+			RETURN
+			    IF (
+			        HASONEVALUE ( dim_product[category] ) && NOT ISBLANK ( _cur ),
+			        DIVIDE ( SUMX ( FILTER ( _cats, [@rev] >= _cur ), [@rev] ), SUMX ( _cats, [@rev] ) )
+			    )
+		formatString: 0.00%
+		displayFolder: 3 Revenue
+		lineageTag: 35d3f469-a120-50dd-801a-07bddf3fdc72
+
+	measure 'Cumulative % of Categories' =
+			DIVIDE (
+			    [Category Rank],
+			    COUNTROWS ( FILTER ( ALL ( dim_product[category] ), NOT ISBLANK ( [Revenue] ) ) )
+			)
+		formatString: 0.00%
+		displayFolder: 3 Revenue
+		lineageTag: b971594a-b0b3-56dc-a59f-224a33b5410a
+
+	/// sql/06 rule: blank when the previous month has fewer than 500 delivered orders.
+	/// BLANK >= 500 is FALSE, so a month with no orders before it is blank too. dim_date
+	/// is marked as the date table, so the DATEADD filter on dim_date[date] also clears a
+	/// page filter on dim_date[is_partial_edge] while the previous month is evaluated.
+	measure 'Revenue MoM %' =
+			VAR _prevOrders = CALCULATE ( [Delivered Orders], DATEADD ( dim_date[date], -1, MONTH ) )
+			VAR _prevRevenue = CALCULATE ( [Revenue], DATEADD ( dim_date[date], -1, MONTH ) )
+			RETURN
+			    IF (
+			        HASONEVALUE ( dim_date[month_start] ) && _prevOrders >= 500,
+			        DIVIDE ( [Revenue], _prevRevenue ) - 1
+			    )
+		formatString: 0.00%
+		displayFolder: 3 Revenue
+		lineageTag: f62ecccb-4924-5cf0-860e-298bb9c8e4d0
+
+	measure 'Orders (delay scope)' = CALCULATE ( COUNTROWS ( fact_orders ), fact_orders[in_delay_scope] = 1 )
+		formatString: #,0
+		displayFolder: 4 Satisfaction
+		lineageTag: 6036e88c-3a57-576b-82d5-701664b6b232
+
+	measure 'Orders (review scope)' = CALCULATE ( COUNTROWS ( fact_orders ), fact_orders[in_review_scope] = 1 )
+		formatString: #,0
+		displayFolder: 4 Satisfaction
+		lineageTag: 51ed4cbd-ad16-5ba5-9468-1e84d5e8e5d4
+
+	/// delay_bucket is sorted by delay_bucket_order, so Power BI filters both columns for
+	/// each bar. ALL ( fact_orders[delay_bucket] ) alone would leave the sort column
+	/// filtered and every bar would show 100%.
+	measure '% of Orders (delay bucket)' =
+			DIVIDE (
+			    [Orders (review scope)],
+			    CALCULATE (
+			        [Orders (review scope)],
+			        ALL ( fact_orders[delay_bucket], fact_orders[delay_bucket_order] )
+			    )
+			)
+		formatString: 0.00%
+		displayFolder: 4 Satisfaction
+		lineageTag: 1b248af2-2e45-5c65-a6ea-e50bdc1b5778
+
+	/// Seller or product slicing: dim_seller / dim_product filter fact_order_items only.
+	/// CROSSFILTER makes the filtered items filter fact_orders for this measure only, so
+	/// an order counts for every seller state (or category) among its items, which is the
+	/// attribution rule of sql/17, sql/13 and sql/21. Rows do not add up to the total.
+	measure 'Orders (seller/category)' = CALCULATE ( [Orders (delay scope)], CROSSFILTER ( fact_order_items[order_id], fact_orders[order_id], BOTH ) )
+		formatString: #,0
+		displayFolder: 4 Satisfaction
+		lineageTag: ffd324e8-3fb7-593e-96b9-59d08bdde076
+
+	measure 'Reviewed Orders (seller/category)' = CALCULATE ( [Orders (review scope)], CROSSFILTER ( fact_order_items[order_id], fact_orders[order_id], BOTH ) )
+		formatString: #,0
+		displayFolder: 4 Satisfaction
+		lineageTag: d7f9eb38-2e76-58e0-8f79-bbf14c5bbeaf
+
+	measure 'Late % (seller/category)' = CALCULATE ( [Late %], CROSSFILTER ( fact_order_items[order_id], fact_orders[order_id], BOTH ) )
+		formatString: 0.00%
+		displayFolder: 4 Satisfaction
+		lineageTag: 8332dfb2-2143-56ae-9d0c-d0272c929b64
+
+	measure 'Low Review % (seller/category)' = CALCULATE ( [Low Review %], CROSSFILTER ( fact_order_items[order_id], fact_orders[order_id], BOTH ) )
+		formatString: 0.00%
+		displayFolder: 4 Satisfaction
+		lineageTag: 16a67cd4-1ed7-5195-bb0b-024144faae13
+
+	measure 'Freight % of Price' =
+			DIVIDE (
+			    CALCULATE ( SUM ( fact_order_items[freight_value] ), fact_orders[is_delivered] = 1 ),
+			    [Revenue]
+			)
+		formatString: 0.00%
+		displayFolder: 5 Freight
+		lineageTag: f1508d20-fcc8-5fac-97f7-b99923a9278b
+
+	/// Low-review rate on on-time orders: highest minus lowest freight-share bucket.
+	measure 'Freight Gap On Time (pp)' =
+			(
+			    CALCULATE ( [Low Review % (On time)], fact_orders[freight_bucket_order] = 5 )
+			        - CALCULATE ( [Low Review % (On time)], fact_orders[freight_bucket_order] = 1 )
+			) * 100
+		formatString: 0.00
+		displayFolder: 5 Freight
+		lineageTag: a8529c95-3633-5f84-a97b-8be3bc50d725
+
+	measure 'Lateness Gap (pp)' = ( [Low Review % (Late)] - [Low Review % (On time)] ) * 100
+		formatString: 0.00
+		displayFolder: 5 Freight
+		lineageTag: c7b21af3-d92d-57ca-9da9-4b98313e2e7b
+
+	measure 'Late Cut % Value' = SELECTEDVALUE ( 'Late Cut'[Late Cut %], 50 ) / 100
+		formatString: 0.00%
+		displayFolder: 6 What-if
+		lineageTag: 0980a431-ff6a-5d12-bbd1-8fcdbc656383
+
+	measure 'Late Orders (review scope)' = CALCULATE ( [Orders (review scope)], fact_orders[is_late] = 1 )
+		formatString: #,0
+		displayFolder: 6 What-if
+		lineageTag: 9035d62f-b6d0-5fb5-bbdb-88c06203f857
+
+	measure 'Orders Rescued (what-if)' = [Late Orders (review scope)] * [Late Cut % Value]
+		formatString: #,0
+		displayFolder: 6 What-if
+		lineageTag: 0db4945c-7aef-5db6-80a0-7aba1e874991
+
+	/// UPPER BOUND: assumes a rescued order is reviewed like today's on-time orders.
+	/// The rates come from the measures; none are typed.
+	measure 'Low Reviews Avoided (upper bound)' = [Orders Rescued (what-if)] * ( [Low Review % (Late)] - [Low Review % (On time)] )
+		formatString: #,0
+		displayFolder: 6 What-if
+		lineageTag: 589dcf10-ba05-5bbf-910a-1513c6677ac7
+
+	measure 'Low Reviews Avoided % (upper bound)' =
+			DIVIDE (
+			    [Low Reviews Avoided (upper bound)],
+			    CALCULATE ( [Orders (review scope)], fact_orders[is_low_review] = 1 )
+			)
+		formatString: 0.00%
+		displayFolder: 6 What-if
+		lineageTag: aae19705-2cca-513d-8847-07df6307d255
+
+	measure '% of Customers (segment)' = DIVIDE ( [Customers], CALCULATE ( [Customers], ALL ( dim_customer ) ) )
+		formatString: 0.00%
+		displayFolder: 7 Customers
+		lineageTag: 1642fac7-d5e6-5720-9407-817941c559bd
+
+	measure '% of Revenue (segment)' = DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( dim_customer ) ) )
+		formatString: 0.00%
+		displayFolder: 7 Customers
+		lineageTag: 1a54babc-839e-51da-aabb-b659f723da7a
+
+	measure 'Flag % Value' = SELECTEDVALUE ( 'Flag %'[Flag %], 10 )
+		formatString: 0
+		displayFolder: 8 Model
+		lineageTag: ca2d7af5-bdf0-5adf-8f6a-1f07290316f7
+
+	/// top_frac is stored as a fraction (0.01 ... 1.00). Compare whole percents, not
+	/// floating-point fractions. The VAR is evaluated once, outside the FILTER iteration.
+	measure 'Recall at Flag %' =
+			VAR _f = [Flag % Value]
+			RETURN
+			    CALCULATE (
+			        MAX ( model_capture_curve[recall_at_top] ),
+			        FILTER ( ALL ( model_capture_curve[top_frac] ), ROUND ( model_capture_curve[top_frac] * 100, 0 ) = _f )
+			    )
+		formatString: 0.00%
+		displayFolder: 8 Model
+		lineageTag: 4e057a16-9295-561b-9d9d-55d5fcec411a
+
+	measure 'Precision at Flag %' =
+			VAR _f = [Flag % Value]
+			RETURN
+			    CALCULATE (
+			        MAX ( model_capture_curve[precision_at_top] ),
+			        FILTER ( ALL ( model_capture_curve[top_frac] ), ROUND ( model_capture_curve[top_frac] * 100, 0 ) = _f )
+			    )
+		formatString: 0.00%
+		displayFolder: 8 Model
+		lineageTag: cd1b9791-451a-525b-bc0c-88c7b4d11c4b
+
+	measure 'Lift at Flag %' =
+			VAR _f = [Flag % Value]
+			RETURN
+			    CALCULATE (
+			        MAX ( model_capture_curve[lift_vs_random] ),
+			        FILTER ( ALL ( model_capture_curve[top_frac] ), ROUND ( model_capture_curve[top_frac] * 100, 0 ) = _f )
+			    )
+		formatString: 0.00
+		displayFolder: 8 Model
+		lineageTag: bd6d3cac-db7b-5c60-93d7-4b45a756dab7
+
+	measure 'ROC-AUC (LightGBM, test)' =
+			CALCULATE ( MAX ( model_metrics[roc_auc] ),
+			    model_metrics[model] = "LightGBM", model_metrics[evaluation] = "Stratified random split" )
+		formatString: 0.000
+		displayFolder: 8 Model
+		lineageTag: a0fb5d36-e139-5014-b890-d076a873304a
+
+	measure 'PR-AUC (LightGBM, test)' =
+			CALCULATE ( MAX ( model_metrics[pr_auc] ),
+			    model_metrics[model] = "LightGBM", model_metrics[evaluation] = "Stratified random split" )
+		formatString: 0.000
+		displayFolder: 8 Model
+		lineageTag: fc9add3f-1e8c-5c31-b267-b7208c260e3f
+
+	/// The evaluation label embeds the cutoff date ("Out-of-time (train < 2018-05-01)").
+	measure 'ROC-AUC (LightGBM, out-of-time)' =
+			CALCULATE ( MAX ( model_metrics[roc_auc] ),
+			    model_metrics[model] = "LightGBM", LEFT ( model_metrics[evaluation], 11 ) = "Out-of-time" )
+		formatString: 0.000
+		displayFolder: 8 Model
+		lineageTag: a8d957e8-07b2-5954-b852-e50eba0d1ff1
+
+	measure 'PR-AUC (LightGBM, out-of-time)' =
+			CALCULATE ( MAX ( model_metrics[pr_auc] ),
+			    model_metrics[model] = "LightGBM", LEFT ( model_metrics[evaluation], 11 ) = "Out-of-time" )
+		formatString: 0.000
+		displayFolder: 8 Model
+		lineageTag: 106f1771-b66c-5dfe-b1d2-c9fd34c1b1ce
+
+	partition _Measures = calculated
+		mode: import
+		source = ROW ( "Placeholder", 0 )

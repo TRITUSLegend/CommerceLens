@@ -1,0 +1,41 @@
+table recon_seller_state
+	lineageTag: 6c445ad7-cdf6-53b7-99ae-3c11e50f6427
+
+	column seller_state
+		dataType: string
+		lineageTag: c27652af-36af-5427-b8ff-bf1b21ea1ce5
+		summarizeBy: none
+		sourceColumn: seller_state
+
+	column orders
+		dataType: int64
+		lineageTag: 6c36e2de-8cea-5b73-96cc-ae8ebd38fdb4
+		summarizeBy: none
+		sourceColumn: orders
+
+	column late_pct
+		dataType: double
+		lineageTag: a5f25eef-3c9b-5e82-8e06-99c0373d751e
+		summarizeBy: none
+		sourceColumn: late_pct
+
+	column reviewed_orders
+		dataType: int64
+		lineageTag: 5004a01b-c49c-590c-8d03-db4d7e449c7e
+		summarizeBy: none
+		sourceColumn: reviewed_orders
+
+	column pct_low_review
+		dataType: double
+		lineageTag: d7912723-6413-517e-af2e-3fd5eda0ca34
+		summarizeBy: none
+		sourceColumn: pct_low_review
+
+	partition recon_seller_state = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "recon_seller_state.parquet"))
+				in
+				    Source
+
