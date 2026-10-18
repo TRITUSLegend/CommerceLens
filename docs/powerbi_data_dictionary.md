@@ -19,7 +19,7 @@ true/false). "Blank" means NULL in parquet and BLANK in DAX.
 | `fact_orders[customer_state]` | `dim_state[state_code]` |
 | `fact_orders[purchase_date]` | `dim_date[date]` (date table) |
 
-`recon_sql`, `recon_seller_state` and the six Model page tables have no relationships.
+`recon_sql`, `recon_seller_state`, `lane_lead_time` and the six Model page tables have no relationships.
 
 ## fact_orders: one row per order, all statuses (99,441 rows)
 
@@ -133,6 +133,27 @@ the SQL files so DAX filters on 0/1 values and never compares a column with BLAN
 | `late_pct` | decimal | Late % of those orders | `sql/21` |
 | `reviewed_orders` | whole number | Those orders that have a review | `sql/21` |
 | `pct_low_review` | decimal | Low-review % of the reviewed orders | `sql/21` |
+
+## lane_lead_time: delivery lead time by lane (124 rows; Stage 6, exploratory)
+
+Delivered orders with a delivery date whose items ship from one seller state; lanes with 30+ orders.
+See [`lead_time_by_lane.md`](lead_time_by_lane.md).
+
+| Column | Type | Definition | Mirrors |
+|---|---|---|---|
+| `seller_state` | text | Seller state (origin) | `sql/22_lane_lead_time.sql` |
+| `customer_state` | text | Customer state (destination) | `sql/22` |
+| `lane` | text | "SP -> RJ" label | `sql/22` |
+| `orders` | whole number | Orders in the lane | `sql/22` |
+| `p50_delivery_days` | whole number | Smallest `d` with at least 50% of orders delivered within `d` days of purchase | `sql/22` (CUME_DIST) |
+| `p90_delivery_days` | whole number | Same at 90%: the shortest promise met for 90% of orders | `sql/22` |
+| `p95_delivery_days` | whole number | Same at 95% | `sql/22` |
+| `avg_promised_days` | decimal | Average days from purchase to the estimated (promised) date | `sql/22` |
+| `on_time_pct_today` | decimal | % of orders delivered on or before their promised date | `sql/22` |
+| `on_time_pct_at_p90` | decimal | % of orders that a fixed promise of `p90_delivery_days` would have met (at least 90) | `sql/22` |
+| `on_time_pct_at_p95` | decimal | Same for `p95_delivery_days` (at least 95) | `sql/22` |
+| `gap_p90_vs_avg_promise_days` | decimal | `p90_delivery_days` minus `avg_promised_days` | `sql/22` |
+| `gap_p95_vs_avg_promise_days` | decimal | `p95_delivery_days` minus `avg_promised_days` | `sql/22` |
 
 ## Model page tables (copied byte for byte from `dashboard/data/`, built by `scripts/build_dashboard_data.py`)
 

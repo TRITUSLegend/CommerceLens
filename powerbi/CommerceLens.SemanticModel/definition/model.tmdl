@@ -18,6 +18,7 @@ ref table dim_state
 ref table dim_date
 ref table recon_sql
 ref table recon_seller_state
+ref table lane_lead_time
 ref table model_metrics
 ref table model_capture_curve
 ref table shap_importance
