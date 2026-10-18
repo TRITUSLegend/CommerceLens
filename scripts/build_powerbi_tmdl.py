@@ -80,7 +80,8 @@ ARROW_TO_TMDL = {"string": "string", "large_string": "string", "double": "double
 FOLDERS = [  # markdown heading keyword -> display folder
     ("Core measures", "1 Core"), ("Reconciliation measures", "2 Reconciliation"),
     ("Revenue page", "3 Revenue"), ("Satisfaction page", "4 Satisfaction"),
-    ("Freight test", "5 Freight"), ("What-if", "6 What-if"),
+    ("Seller concentration", "4 Satisfaction"), ("Freight test", "5 Freight"),
+    ("What-if", "6 What-if"), ("Formatting helpers", "9 Formatting"),
     ("Customers & RFM", "7 Customers"), ("Model page", "8 Model"),
 ]
 
@@ -197,7 +198,8 @@ def static_checks(schemas: dict, defs: list[dict]) -> list[str]:
 
 # ---------------------------------------------------------------- writers
 def format_string(name: str):
-    if name in TEXT_MEASURES:
+    if name in TEXT_MEASURES or name.endswith(("Color", "Color (state)", "Color (seller state)",
+                                               "Color (category)")):
         return None
     if name in COUNT_MEASURES:
         return "#,0"
@@ -272,6 +274,12 @@ def write_calc_table(name: str, column: str, expression: str, hidden: bool = Fal
 def main() -> int:
     if not (DATA / "fact_orders.parquet").exists():
         print("powerbi/data/ is missing. Run: python scripts/build_powerbi_data.py")
+        return 1
+    if (OUT / "database.tmdl").exists() and "--force" not in sys.argv:
+        # database.tmdl is only written by Power BI Desktop: the model has been opened and
+        # saved there, and regenerating would overwrite Desktop's (tested) files.
+        print(f"{OUT.relative_to(ROOT)} has been saved by Power BI Desktop (database.tmdl present). "
+              "Not overwriting it; rerun with --force to regenerate anyway.")
         return 1
     schemas = {}
     for t in TABLES:
