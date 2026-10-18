@@ -44,9 +44,14 @@ itself. Take them from a blank project:
    - into `powerbi\CommerceLens.SemanticModel\`: `definition.pbism` and `.platform` (if present)
    - into `powerbi\CommerceLens.SemanticModel\definition\`: `database.tmdl` only. Do **not** copy
      the shell's `model.tmdl`, `tables\` or `cultures\`.
-5. Open `powerbi\CommerceLens.pbip`, then **Home > Refresh**. The `DataFolder` parameter points to
-   this repo's `powerbi\data\` on the machine where the generator ran; if the repo has moved, use
-   **Transform data > Edit parameters > DataFolder** (keep the trailing backslash).
+5. Open `powerbi\CommerceLens.pbip`. The `DataFolder` parameter is committed as a placeholder
+   (`REPLACE_WITH_FULL_PATH_TO\powerbi\data\`), so nothing loads yet: **Transform data > Edit
+   parameters > DataFolder** = the full path to this repo's `powerbi\data\` folder, ending with a
+   backslash > OK > **Apply changes**, then **Home > Refresh**.
+   When you save, Desktop writes that local path into `definition\expressions.tmdl`. Keep it out of
+   git by telling git to ignore your local copy of that one file (run once, from the repo root):
+   `git update-index --skip-worktree powerbi/CommerceLens.SemanticModel/definition/expressions.tmdl`.
+   Before any commit, `git grep -E 'DataFolder = "[A-Za-z]:'` should print nothing.
 6. If Desktop rejects a file, its message names the file and line. Note it, then use the manual build.
 
 Once it opens, continue with step 6 of `docs/powerbi_build_checklist.md` (Reconciliation page).

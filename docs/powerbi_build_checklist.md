@@ -143,8 +143,13 @@ Risk model, Findings, Reconciliation.
 
 ## 10. Commit (locally; push when ready)
 
+The saved project stores the `DataFolder` value (your local path, including your Windows user
+name) in `definition\expressions.tmdl`. The committed copy holds a placeholder; keep it that way:
+
 ```powershell
+git update-index --skip-worktree powerbi/CommerceLens.SemanticModel/definition/expressions.tmdl
 git add powerbi/CommerceLens.pbip powerbi/CommerceLens.Report powerbi/CommerceLens.SemanticModel docs/powerbi
+git grep -E 'DataFolder = "[A-Za-z]:'   # must print nothing (no local path committed)
 git status   # .pbi/cache.abf and .pbi/localSettings.json are gitignored; no *.pbix, no powerbi/data
 git commit -m "Add Power BI report (PBIP), PDF export and screenshots"
 ```
