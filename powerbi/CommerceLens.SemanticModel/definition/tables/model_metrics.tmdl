@@ -1,0 +1,47 @@
+table model_metrics
+	lineageTag: f1229bea-adc2-59e0-8687-d812d0fdcdfe
+
+	column model
+		dataType: string
+		lineageTag: ec937efb-fcf5-538f-a745-6bd27e10fdb0
+		summarizeBy: none
+		sourceColumn: model
+
+	column evaluation
+		dataType: string
+		lineageTag: ca3b886b-b14d-5a32-8979-0e41879bcd39
+		summarizeBy: none
+		sourceColumn: evaluation
+
+	column positive_rate
+		dataType: double
+		lineageTag: 2678d3d1-b033-5141-b5ae-7d9dba438a98
+		summarizeBy: sum
+		sourceColumn: positive_rate
+
+	column roc_auc
+		dataType: double
+		lineageTag: 3e2f4b54-eb26-5e4e-9177-5377a49298b4
+		summarizeBy: sum
+		sourceColumn: roc_auc
+
+	column pr_auc
+		dataType: double
+		lineageTag: b692b47b-4b65-5533-a66d-0cd8219f8eaa
+		summarizeBy: sum
+		sourceColumn: pr_auc
+
+	column pr_auc_lift
+		dataType: double
+		lineageTag: 10b89278-b011-5b5a-8bde-186c8d750416
+		summarizeBy: sum
+		sourceColumn: pr_auc_lift
+
+	partition model_metrics = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "model_metrics.parquet"))
+				in
+				    Source
+

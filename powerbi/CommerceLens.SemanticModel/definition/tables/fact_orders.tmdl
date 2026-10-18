@@ -1,0 +1,159 @@
+table fact_orders
+	lineageTag: fe623dff-2edc-5a23-8489-1face66447e7
+
+	column order_id
+		dataType: string
+		lineageTag: 4e126c52-43ff-5ae8-8341-3caa963c7762
+		summarizeBy: none
+		sourceColumn: order_id
+
+	column customer_unique_id
+		dataType: string
+		isHidden
+		lineageTag: 42e6b266-2e3c-5bfe-a48d-176836a03f19
+		summarizeBy: none
+		sourceColumn: customer_unique_id
+
+	column customer_state
+		dataType: string
+		isHidden
+		lineageTag: 8bc88bae-5ba6-53cd-8650-f7f245497958
+		summarizeBy: none
+		sourceColumn: customer_state
+
+	column order_status
+		dataType: string
+		lineageTag: fc44ded8-950f-59ef-ab52-a97ea745c97e
+		summarizeBy: none
+		sourceColumn: order_status
+
+	column purchase_date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		isHidden
+		lineageTag: 20767a2b-e6d3-5aba-b300-be992a374e09
+		summarizeBy: none
+		sourceColumn: purchase_date
+
+	column estimated_delivery_date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 99676085-97e4-5d44-b22f-c4fa2302b439
+		summarizeBy: none
+		sourceColumn: estimated_delivery_date
+
+	column delivered_date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: d82d3d80-b742-5040-a290-12873c171fa1
+		summarizeBy: none
+		sourceColumn: delivered_date
+
+	column items_value
+		dataType: double
+		lineageTag: acd12899-20e9-5ca8-bd3d-f98d6f4a2cb5
+		summarizeBy: none
+		sourceColumn: items_value
+
+	column freight_value
+		dataType: double
+		lineageTag: d4273cef-f3e0-5bd5-9d13-91c7d2eae6ab
+		summarizeBy: none
+		sourceColumn: freight_value
+
+	column n_items
+		dataType: int64
+		lineageTag: 4bc24d2c-f8a8-5cd8-bdf1-559f25b850c5
+		summarizeBy: none
+		sourceColumn: n_items
+
+	column n_sellers
+		dataType: int64
+		lineageTag: c7954226-1454-593a-bd6e-6049d00d8c1b
+		summarizeBy: none
+		sourceColumn: n_sellers
+
+	column review_score
+		dataType: int64
+		lineageTag: 455226ba-ed7f-5302-b264-5671b131e4bd
+		summarizeBy: none
+		sourceColumn: review_score
+
+	column delay_days
+		dataType: int64
+		lineageTag: 1f8e6d42-b329-5a63-b900-231066e8dc32
+		summarizeBy: none
+		sourceColumn: delay_days
+
+	column delivery_days
+		dataType: int64
+		lineageTag: 9b5c2566-300b-5c61-ac88-0df58c654a7d
+		summarizeBy: none
+		sourceColumn: delivery_days
+
+	column is_delivered
+		dataType: int64
+		lineageTag: cbd68165-6b17-5e63-9dae-fc122e0081ef
+		summarizeBy: none
+		sourceColumn: is_delivered
+
+	column in_delay_scope
+		dataType: int64
+		lineageTag: 943be6e7-b0d8-5d1b-b01e-ddacc241adf7
+		summarizeBy: none
+		sourceColumn: in_delay_scope
+
+	column in_review_scope
+		dataType: int64
+		lineageTag: 009c1421-9fe2-5698-87fe-1bd9df93108e
+		summarizeBy: none
+		sourceColumn: in_review_scope
+
+	column is_late
+		dataType: int64
+		lineageTag: c72b7e28-5d23-5306-a539-ba9b91fda774
+		summarizeBy: none
+		sourceColumn: is_late
+
+	column is_low_review
+		dataType: int64
+		lineageTag: 7ce36bd6-6739-5b30-8649-73a88aadbb62
+		summarizeBy: none
+		sourceColumn: is_low_review
+
+	column delay_bucket
+		dataType: string
+		lineageTag: 27979b2c-0d63-580c-ad95-81ed49962937
+		summarizeBy: none
+		sourceColumn: delay_bucket
+		sortByColumn: delay_bucket_order
+
+	column delay_bucket_order
+		dataType: int64
+		isHidden
+		lineageTag: 8a815131-867f-5b06-a5c1-84b78abc0fea
+		summarizeBy: none
+		sourceColumn: delay_bucket_order
+
+	column freight_share_bucket
+		dataType: string
+		lineageTag: fad2c4e6-e7c9-58b7-9e8a-1da068da5411
+		summarizeBy: none
+		sourceColumn: freight_share_bucket
+		sortByColumn: freight_bucket_order
+
+	column freight_bucket_order
+		dataType: int64
+		isHidden
+		lineageTag: b23c7e2c-c004-5477-9624-41279aacd041
+		summarizeBy: none
+		sourceColumn: freight_bucket_order
+
+	partition fact_orders = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "fact_orders.parquet"))
+				in
+				    Source
+

@@ -1,0 +1,55 @@
+table dim_customer
+	lineageTag: d564d22c-df81-5a1a-a119-3a00c08303e3
+
+	column customer_unique_id
+		dataType: string
+		lineageTag: c4a36c29-0df8-5251-816d-9b554fd0d423
+		summarizeBy: none
+		sourceColumn: customer_unique_id
+
+	column segment
+		dataType: string
+		lineageTag: f7dddb6a-7b1b-5b03-9018-ae3140f232fe
+		summarizeBy: none
+		sourceColumn: segment
+		sortByColumn: segment_order
+
+	column segment_order
+		dataType: int64
+		isHidden
+		lineageTag: f638bd3a-f5a2-574d-a5b9-06c55148d922
+		summarizeBy: none
+		sourceColumn: segment_order
+
+	column r_score
+		dataType: int64
+		lineageTag: c3b94a4e-59e8-5660-8218-0af6cf41087d
+		summarizeBy: none
+		sourceColumn: r_score
+
+	column m_score
+		dataType: int64
+		lineageTag: 2d67371e-2690-5a01-a24a-9e42032a72e4
+		summarizeBy: none
+		sourceColumn: m_score
+
+	column recency_days
+		dataType: int64
+		lineageTag: aedf4c61-ab62-5b0f-8906-be76a043a12d
+		summarizeBy: none
+		sourceColumn: recency_days
+
+	column is_repeat_buyer
+		dataType: int64
+		lineageTag: b3849f83-7741-5859-b686-b43e8c3e5f96
+		summarizeBy: none
+		sourceColumn: is_repeat_buyer
+
+	partition dim_customer = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "dim_customer.parquet"))
+				in
+				    Source
+

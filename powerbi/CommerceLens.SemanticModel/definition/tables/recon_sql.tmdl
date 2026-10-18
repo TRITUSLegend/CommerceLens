@@ -1,0 +1,49 @@
+table recon_sql
+	lineageTag: c83c1ed5-3f26-5fdf-8701-3e8f5a638449
+
+	column sort_order
+		dataType: int64
+		isHidden
+		lineageTag: 7d701407-c4a5-5edd-86a4-e33ad212698c
+		summarizeBy: none
+		sourceColumn: sort_order
+
+	column metric
+		dataType: string
+		lineageTag: c5429c89-3daf-5799-a4ba-3c24abf34a4a
+		summarizeBy: none
+		sourceColumn: metric
+		sortByColumn: sort_order
+
+	column sql_value
+		dataType: double
+		lineageTag: 244ddcad-7dcf-53fd-a8cb-b4f4fa3295f3
+		summarizeBy: none
+		sourceColumn: sql_value
+
+	column tolerance
+		dataType: double
+		lineageTag: 2cfdcf59-b0a1-5d1e-a4f4-6ef332b44ade
+		summarizeBy: none
+		sourceColumn: tolerance
+
+	column unit
+		dataType: string
+		lineageTag: 0b7e58f4-1113-5b89-a633-2bc1c273a360
+		summarizeBy: none
+		sourceColumn: unit
+
+	column sql_source
+		dataType: string
+		lineageTag: 371d0f17-9fc1-55fc-af3a-408e67f95f65
+		summarizeBy: none
+		sourceColumn: sql_source
+
+	partition recon_sql = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "recon_sql.parquet"))
+				in
+				    Source
+
