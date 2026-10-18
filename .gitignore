@@ -26,3 +26,5 @@ CLAUDE.md
 Thumbs.db
 
 # NOTE: dashboard/data/*.parquet is intentionally tracked (small, pre-aggregated).
+
+powerbi/**/.pbi/
