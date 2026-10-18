@@ -4,10 +4,10 @@
   "position": {
     "x": 1072,
     "y": 42,
-    "z": 3,
+    "z": 3000,
     "height": 182,
     "width": 126,
-    "tabOrder": 3
+    "tabOrder": 3000
   },
   "visual": {
     "visualType": "cardVisual",
@@ -52,23 +52,5 @@
       }
     },
     "drillFilterOtherVisuals": true
-  },
-  "filterConfig": {
-    "filters": [
-      {
-        "name": "6f0beb1c14ed399d3517",
-        "field": {
-          "Measure": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "_Measures"
-              }
-            },
-            "Property": "AOV"
-          }
-        },
-        "type": "Advanced"
-      }
-    ]
   }
 }

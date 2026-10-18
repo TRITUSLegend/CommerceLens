@@ -4,10 +4,10 @@
   "position": {
     "x": 852,
     "y": 476,
-    "z": 8,
+    "z": 8000,
     "height": 528,
     "width": 780,
-    "tabOrder": 8
+    "tabOrder": 8000
   },
   "visual": {
     "visualType": "lineChart",
@@ -188,20 +188,6 @@
         },
         "type": "Advanced",
         "howCreated": "User"
-      },
-      {
-        "name": "e929e2abc31a08d9fcea",
-        "field": {
-          "Measure": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "_Measures"
-              }
-            },
-            "Property": "Late %"
-          }
-        },
-        "type": "Advanced"
       }
     ],
     "filterSortOrder": "Custom"
