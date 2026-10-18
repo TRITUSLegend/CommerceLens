@@ -12,3 +12,4 @@ table 'Late Cut'
 	partition 'Late Cut' = calculated
 		mode: import
 		source = SELECTCOLUMNS ( GENERATESERIES ( 0, 100, 5 ), "Late Cut %", [Value] )
+

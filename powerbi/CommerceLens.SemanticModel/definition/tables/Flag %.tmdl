@@ -12,3 +12,4 @@ table 'Flag %'
 	partition 'Flag %' = calculated
 		mode: import
 		source = SELECTCOLUMNS ( GENERATESERIES ( 1, 100, 1 ), "Flag %", [Value] )
+

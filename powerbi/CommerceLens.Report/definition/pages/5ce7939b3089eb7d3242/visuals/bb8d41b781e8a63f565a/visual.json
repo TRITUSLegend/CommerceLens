@@ -1,0 +1,108 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "bb8d41b781e8a63f565a",
+  "position": {
+    "x": 395.55555555555554,
+    "y": 150,
+    "z": 1,
+    "height": 507.77777777777777,
+    "width": 706.66666666666663,
+    "tabOrder": 1
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "recon_sql"
+                    }
+                  },
+                  "Property": "metric"
+                }
+              },
+              "queryRef": "recon_sql.metric",
+              "nativeQueryRef": "metric"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Measures"
+                    }
+                  },
+                  "Property": "SQL Value"
+                }
+              },
+              "queryRef": "_Measures.SQL Value",
+              "nativeQueryRef": "SQL Value"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Measures"
+                    }
+                  },
+                  "Property": "DAX Value"
+                }
+              },
+              "queryRef": "_Measures.DAX Value",
+              "nativeQueryRef": "DAX Value"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Measures"
+                    }
+                  },
+                  "Property": "Diff"
+                }
+              },
+              "queryRef": "_Measures.Diff",
+              "nativeQueryRef": "Diff"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Measures"
+                    }
+                  },
+                  "Property": "Tolerance"
+                }
+              },
+              "queryRef": "_Measures.Tolerance",
+              "nativeQueryRef": "Tolerance"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Measures"
+                    }
+                  },
+                  "Property": "Status"
+                }
+              },
+              "queryRef": "_Measures.Status",
+              "nativeQueryRef": "Status"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

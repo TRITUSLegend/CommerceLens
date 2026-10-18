@@ -21,3 +21,4 @@ relationship 0a3681e3-b8b3-5e17-9bad-d49d96fbb536
 relationship aa1fcdc8-f9c8-5ce6-8025-8e0597c2ec92
 	fromColumn: fact_orders.purchase_date
 	toColumn: dim_date.date
+
