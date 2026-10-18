@@ -15,7 +15,8 @@ Model.masks), then the results are compared with the SQL layer:
                                        D1 sql/03 Pareto, D2 sql/06 monthly + MoM, D3 sql/11
                                        delay buckets, D4 sql/14 customer state, D5 sql/21
                                        seller state, D6 sql/13 category, D7 sql/15 freight,
-                                       D8 Streamlit what-if, D9 sql/09 RFM segments
+                                       D8 Streamlit what-if, D9 sql/09 RFM segments,
+                                       D10 Model page lookups on the copied model tables
 
 A pass in B, C or D means the measure's LOGIC (filters, scope flags, relationships)
 reproduces SQL. The DAX itself is not executed, so those measures are
@@ -566,6 +567,25 @@ def section_d_report_pages(dax: Measures) -> None:
         check("D9", f"{s}: % of Revenue (segment)", 100 * dax.pct_of_revenue_segment(c), r.pct_of_revenue, HALF_2DP, L)
 
 
+def section_d10_model_page() -> None:
+    """Model page lookups on the copied tables. Recall/Precision/Lift at Flag % read
+    model_capture_curve with ROUND ( top_frac * 100, 0 ) = Flag %; compared with the
+    separate model_capture.parquet written by the same capture_at_top() call."""
+    curve = pd.read_parquet(PBI / "model_capture_curve.parquet")
+    for r in pd.read_parquet(DASH / "model_capture.parquet").itertuples():
+        flag = int(round(r.top_frac * 100))
+        row = curve[np.round(curve["top_frac"] * 100) == flag]
+        for col, measure in [("recall_at_top", "Recall"), ("precision_at_top", "Precision"),
+                             ("lift_vs_random", "Lift")]:
+            check("D10", f"Flag {flag}%: {measure} at Flag %", row[col].max(), getattr(r, col), 1e-12, "LOGIC-CHECKED")
+    m = pd.read_parquet(PBI / "model_metrics.parquet")
+    lgbm = m[m["model"] == "LightGBM"]
+    test = lgbm[lgbm["evaluation"] == "Stratified random split"]
+    oot = lgbm[lgbm["evaluation"].str[:11] == "Out-of-time"]
+    check("D10", "rows matched by the out-of-time filter", len(oot), 1, 0, "LOGIC-CHECKED")
+    check("D10", "rows matched by the stratified-test filter", len(test), 1, 0, "LOGIC-CHECKED")
+
+
 def round_half_up(x: float) -> int:
     """Power BI's '#,0' format rounds halves away from zero; Python's format rounds to even."""
     return int(math.floor(x + 0.5))
@@ -621,6 +641,7 @@ SECTION_TITLES = {
     "D7": "D7 Freight share of price, on-time-only test  [sql/15 -> freight_vs_review]",
     "D8": "D8 What-if: cut late deliveries  [dashboard/app.py simulator, sql/12]",
     "D9": "D9 RFM segments  [sql/09 -> rfm_segments]",
+    "D10": "D10 Model page lookups  [copied model_* tables vs dashboard/data/model_capture]",
 }
 SHOW_ALL_ROWS = {"A", "B", "D8"}       # other sections print a one-line summary when all match
 
@@ -659,6 +680,7 @@ def main() -> int:
     section_b_core_measures(dax, recon)
     section_c_propagation(dax)
     section_d_report_pages(dax)
+    section_d10_model_page()
     ok = report()
     pitfall_demos(dax)
     return 0 if ok else 1

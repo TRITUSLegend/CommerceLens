@@ -169,3 +169,250 @@ Champions - share of revenue (%)       31.570
 
 All checks passed.
 ```
+
+---
+
+# Report-page measures (Stage 3)
+
+Added for the report pages. Every measure below is mirrored in pandas by
+`scripts/verify_powerbi_measures.py` (sections D1-D9), sliced the way its visual slices it, and
+compared with the SQL file named in its heading. Status: **LOGIC-CHECKED** (the pandas mirror
+matches SQL; the DAX has not been executed in Power BI Desktop).
+
+## Revenue page: category Pareto (mirrors `sql/03_pareto_category.sql`) and monthly trend (`sql/06_monthly_trend.sql`)
+
+```dax
+Revenue Share =
+DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( dim_product ) ) )
+
+Category Rank =
+IF (
+    HASONEVALUE ( dim_product[category] ) && NOT ISBLANK ( [Revenue] ),
+    RANKX ( ALL ( dim_product[category] ), [Revenue], , DESC, SKIP )
+)
+
+-- Pareto curve. ALL (not ALLSELECTED) keeps the curve over all categories, as in
+-- sql/03, even when the visual shows only the top 15. [Revenue] inside ADDCOLUMNS
+-- is a measure, so each category row becomes a filter (context transition); a bare
+-- SUM ( fact_order_items[price] ) there would give every row the grand total.
+-- A category with BLANK @rev fails ">= _cur" and SUMX skips it.
+Cumulative Revenue % =
+VAR _cur = [Revenue]
+VAR _cats =
+    ADDCOLUMNS ( ALL ( dim_product[category] ), "@rev", [Revenue] )
+RETURN
+    IF (
+        HASONEVALUE ( dim_product[category] ) && NOT ISBLANK ( _cur ),
+        DIVIDE ( SUMX ( FILTER ( _cats, [@rev] >= _cur ), [@rev] ), SUMX ( _cats, [@rev] ) )
+    )
+
+Cumulative % of Categories =
+DIVIDE (
+    [Category Rank],
+    COUNTROWS ( FILTER ( ALL ( dim_product[category] ), NOT ISBLANK ( [Revenue] ) ) )
+)
+
+-- sql/06 rule: blank when the previous month has fewer than 500 delivered orders.
+-- BLANK >= 500 is FALSE, so a month with no orders before it is blank too. dim_date
+-- is marked as the date table, so the DATEADD filter on dim_date[date] also clears a
+-- page filter on dim_date[is_partial_edge] while the previous month is evaluated.
+Revenue MoM % =
+VAR _prevOrders = CALCULATE ( [Delivered Orders], DATEADD ( dim_date[date], -1, MONTH ) )
+VAR _prevRevenue = CALCULATE ( [Revenue], DATEADD ( dim_date[date], -1, MONTH ) )
+RETURN
+    IF (
+        HASONEVALUE ( dim_date[month_start] ) && _prevOrders >= 500,
+        DIVIDE ( [Revenue], _prevRevenue ) - 1
+    )
+```
+
+Monthly visuals: axis `dim_date[month_start]`, page filter `dim_date[is_partial_edge] = False`
+(the same edge months the Streamlit toggle hides). `[Revenue]`, `[Delivered Orders]` and `[AOV]`
+by month match `sql/06` as they are.
+
+## Satisfaction page: delay buckets (`sql/11`), customer state (`sql/14`), seller state (`sql/21`), category (`sql/13`)
+
+```dax
+Orders (delay scope) =
+CALCULATE ( COUNTROWS ( fact_orders ), fact_orders[in_delay_scope] = 1 )
+
+Orders (review scope) =
+CALCULATE ( COUNTROWS ( fact_orders ), fact_orders[in_review_scope] = 1 )
+
+-- delay_bucket is sorted by delay_bucket_order, so Power BI filters both columns for
+-- each bar. ALL ( fact_orders[delay_bucket] ) alone would leave the sort column
+-- filtered and every bar would show 100%.
+% of Orders (delay bucket) =
+DIVIDE (
+    [Orders (review scope)],
+    CALCULATE (
+        [Orders (review scope)],
+        ALL ( fact_orders[delay_bucket], fact_orders[delay_bucket_order] )
+    )
+)
+
+-- Seller or product slicing: dim_seller / dim_product filter fact_order_items only.
+-- CROSSFILTER makes the filtered items filter fact_orders for this measure only, so
+-- an order counts for every seller state (or category) among its items, which is the
+-- attribution rule of sql/17, sql/13 and sql/21. Rows do not add up to the total.
+Orders (seller/category) =
+CALCULATE ( [Orders (delay scope)], CROSSFILTER ( fact_order_items[order_id], fact_orders[order_id], BOTH ) )
+
+Reviewed Orders (seller/category) =
+CALCULATE ( [Orders (review scope)], CROSSFILTER ( fact_order_items[order_id], fact_orders[order_id], BOTH ) )
+
+Late % (seller/category) =
+CALCULATE ( [Late %], CROSSFILTER ( fact_order_items[order_id], fact_orders[order_id], BOTH ) )
+
+Low Review % (seller/category) =
+CALCULATE ( [Low Review %], CROSSFILTER ( fact_order_items[order_id], fact_orders[order_id], BOTH ) )
+```
+
+| Visual | Axis | Measures | Matches |
+|---|---|---|---|
+| Delay vs review | `fact_orders[delay_bucket]` (sort by `delay_bucket_order`) | `[Orders (review scope)]`, `[% of Orders (delay bucket)]`, `[Low Review %]`, `[Avg Review]` | `sql/11` (all 8 buckets) |
+| Customer state | `dim_state[state_code]` | `[Orders (delay scope)]`, `[Late %]`, `[Low Review %]` | `sql/14` (27 states) |
+| Seller state | `dim_seller[seller_state]` | `[Orders (seller/category)]`, `[Late % (seller/category)]`, `[Low Review % (seller/category)]` | `sql/21` (22 states) |
+| Category | `dim_product[category]` | `[Late % (seller/category)]`, `[Freight % of Price]` | `sql/13` (32 categories with 300+ orders) |
+
+`[Late %]` by delay bucket is 0% or 100% by construction (the buckets are cut on the same
+`delay_days`), so the bucket chart shows the low-review rate, not lateness. Several seller states
+have fewer than 30 orders (see `recon_seller_state`); add a visual-level filter
+`[Orders (seller/category)] >= 30` so tiny samples are not ranked.
+
+## Freight test (`sql/15_freight_ratio_vs_review.sql`)
+
+```dax
+Freight % of Price =
+DIVIDE (
+    CALCULATE ( SUM ( fact_order_items[freight_value] ), fact_orders[is_delivered] = 1 ),
+    [Revenue]
+)
+
+-- Low-review rate on on-time orders: highest minus lowest freight-share bucket.
+Freight Gap On Time (pp) =
+(
+    CALCULATE ( [Low Review % (On time)], fact_orders[freight_bucket_order] = 5 )
+        - CALCULATE ( [Low Review % (On time)], fact_orders[freight_bucket_order] = 1 )
+) * 100
+
+Lateness Gap (pp) =
+( [Low Review % (Late)] - [Low Review % (On time)] ) * 100
+```
+
+Freight visual: axis `fact_orders[freight_share_bucket]` (sort by `freight_bucket_order`),
+measures `[Orders (review scope)]`, `[Low Review %]`, `[Late % (reviewed)]` and
+`[Low Review % (On time)]`. Use `Late % (reviewed)` here because `sql/15` measures lateness on
+reviewed orders. Show the two gap measures as cards side by side, formatted `0.00 "pp"`.
+
+## What-if: cut late deliveries (matches the Streamlit simulator in `dashboard/app.py`)
+
+```dax
+-- New table (or Modeling > New parameter > Numeric range, 0 to 100, step 5, default 50)
+Late Cut = SELECTCOLUMNS ( GENERATESERIES ( 0, 100, 5 ), "Late Cut %", [Value] )
+
+Late Cut % Value =
+SELECTEDVALUE ( 'Late Cut'[Late Cut %], 50 ) / 100
+
+Late Orders (review scope) =
+CALCULATE ( [Orders (review scope)], fact_orders[is_late] = 1 )
+
+Orders Rescued (what-if) =
+[Late Orders (review scope)] * [Late Cut % Value]
+
+-- UPPER BOUND: assumes a rescued order is reviewed like today's on-time orders.
+-- The rates come from the measures; none are typed.
+Low Reviews Avoided (upper bound) =
+[Orders Rescued (what-if)] * ( [Low Review % (Late)] - [Low Review % (On time)] )
+
+Low Reviews Avoided % (upper bound) =
+DIVIDE (
+    [Low Reviews Avoided (upper bound)],
+    CALCULATE ( [Orders (review scope)], fact_orders[is_low_review] = 1 )
+)
+```
+
+`Late Cut` is a disconnected table driven by a single-select slicer. At 50% the verification script
+computes 3,190.50 orders rescued and 1,695.83 fewer low reviews; Streamlit shows 3,190 / 1,696.
+Power BI's `#,0` format is expected to round the half order up and show 3,191. That is
+**unconfirmed** until the card is seen in Desktop. Label both cards "upper bound".
+
+## Customers & RFM page (`sql/09_rfm_segments.sql`)
+
+```dax
+% of Customers (segment) =
+DIVIDE ( [Customers], CALCULATE ( [Customers], ALL ( dim_customer ) ) )
+
+% of Revenue (segment) =
+DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( dim_customer ) ) )
+```
+
+Axis `dim_customer[segment]` (sort by `segment_order`). `[Customers]` and `[Revenue]` by segment
+match `sql/09` as they are. Customers with no delivered order (segment "No delivered order")
+return blank and drop out of the visual.
+
+## Model page tables (copied, not recomputed)
+
+`scripts/build_powerbi_data.py` copies these from `dashboard/data/` byte for byte (an integrity
+check confirms it). They are built by `scripts/build_dashboard_data.py`; nothing is retrained.
+Load them as standalone tables with no relationships.
+
+| Table | Feeds |
+|---|---|
+| `model_metrics` | Cards: ROC-AUC and PR-AUC for LightGBM (stratified test and out-of-time), logistic regression and the no-skill baseline |
+| `model_capture_curve` | Triage what-if: a `Flag %` parameter (1-100) selects the row where `top_frac = Flag % / 100`; cards show `recall_at_top`, `precision_at_top`, `lift_vs_random`; a line of `recall_at_top` vs `top_frac` is the gain curve |
+| `shap_importance` | Bar: features ranked by `mean_abs_shap` |
+| `shap_state_effect` | Bar: mean SHAP by customer state (states with 50+ test orders) |
+| `model_curves` | Lines: ROC and PR curves (filter on `curve`), one series per `model` |
+| `model_target_comparison` | Table: why low review was chosen over repeat purchase (positive rate, ROC-AUC, PR-AUC, precision in top 10%) |
+
+```dax
+-- New table (or Modeling > New parameter > Numeric range, 1 to 100, step 1, default 10)
+Flag % = SELECTCOLUMNS ( GENERATESERIES ( 1, 100, 1 ), "Flag %", [Value] )
+
+Flag % Value =
+SELECTEDVALUE ( 'Flag %'[Flag %], 10 )
+
+-- top_frac is stored as a fraction (0.01 ... 1.00). Compare whole percents, not
+-- floating-point fractions. The VAR is evaluated once, outside the FILTER iteration.
+Recall at Flag % =
+VAR _f = [Flag % Value]
+RETURN
+    CALCULATE (
+        MAX ( model_capture_curve[recall_at_top] ),
+        FILTER ( ALL ( model_capture_curve[top_frac] ), ROUND ( model_capture_curve[top_frac] * 100, 0 ) = _f )
+    )
+
+Precision at Flag % =
+VAR _f = [Flag % Value]
+RETURN
+    CALCULATE (
+        MAX ( model_capture_curve[precision_at_top] ),
+        FILTER ( ALL ( model_capture_curve[top_frac] ), ROUND ( model_capture_curve[top_frac] * 100, 0 ) = _f )
+    )
+
+Lift at Flag % =
+VAR _f = [Flag % Value]
+RETURN
+    CALCULATE (
+        MAX ( model_capture_curve[lift_vs_random] ),
+        FILTER ( ALL ( model_capture_curve[top_frac] ), ROUND ( model_capture_curve[top_frac] * 100, 0 ) = _f )
+    )
+
+ROC-AUC (LightGBM, test) =
+CALCULATE ( MAX ( model_metrics[roc_auc] ),
+    model_metrics[model] = "LightGBM", model_metrics[evaluation] = "Stratified random split" )
+
+PR-AUC (LightGBM, test) =
+CALCULATE ( MAX ( model_metrics[pr_auc] ),
+    model_metrics[model] = "LightGBM", model_metrics[evaluation] = "Stratified random split" )
+
+-- The evaluation label embeds the cutoff date ("Out-of-time (train < 2018-05-01)").
+ROC-AUC (LightGBM, out-of-time) =
+CALCULATE ( MAX ( model_metrics[roc_auc] ),
+    model_metrics[model] = "LightGBM", LEFT ( model_metrics[evaluation], 11 ) = "Out-of-time" )
+
+PR-AUC (LightGBM, out-of-time) =
+CALCULATE ( MAX ( model_metrics[pr_auc] ),
+    model_metrics[model] = "LightGBM", LEFT ( model_metrics[evaluation], 11 ) = "Out-of-time" )
+```
