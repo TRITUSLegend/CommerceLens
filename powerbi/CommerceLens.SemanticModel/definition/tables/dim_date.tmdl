@@ -1,0 +1,69 @@
+table dim_date
+	lineageTag: 86208b1f-e4e6-5f12-848b-9fb170235265
+	dataCategory: Time
+
+	column date
+		dataType: dateTime
+		isKey
+		formatString: yyyy-mm-dd
+		lineageTag: 0f2e8d42-be04-5185-a961-8273eed10baa
+		summarizeBy: none
+		sourceColumn: date
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column year
+		dataType: int64
+		lineageTag: 740a29a2-af3c-5f9d-858c-49ca5fb717b1
+		summarizeBy: none
+		sourceColumn: year
+
+	column quarter
+		dataType: string
+		lineageTag: 8c971db2-fefe-5926-bc45-7e1b098c7e20
+		summarizeBy: none
+		sourceColumn: quarter
+
+	column month_number
+		dataType: int64
+		isHidden
+		lineageTag: 89a12009-5a67-599d-8ada-52e1d7402a14
+		summarizeBy: none
+		sourceColumn: month_number
+
+	column month_name
+		dataType: string
+		lineageTag: f9a908f7-6307-52a5-807a-c7af51c35082
+		summarizeBy: none
+		sourceColumn: month_name
+		sortByColumn: month_number
+
+	column year_month
+		dataType: string
+		lineageTag: 447bb190-61d9-5b36-8cbb-c51743c1634c
+		summarizeBy: none
+		sourceColumn: year_month
+
+	column month_start
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: b5fa5cff-4b10-5cbf-b0c2-cc22fb09c215
+		summarizeBy: none
+		sourceColumn: month_start
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column is_partial_edge
+		dataType: boolean
+		lineageTag: c5e5a3a8-500e-5fa3-9187-bbed55a23fd6
+		summarizeBy: none
+		sourceColumn: is_partial_edge
+
+	partition dim_date = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "dim_date.parquet"))
+				in
+				    Source
+

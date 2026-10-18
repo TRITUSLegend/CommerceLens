@@ -1,0 +1,89 @@
+table lane_lead_time
+	lineageTag: 4d9d05f7-e8db-5058-8993-da1debc3740b
+
+	column seller_state
+		dataType: string
+		lineageTag: 8799f11c-03f0-5980-94cd-4b1d04660bc4
+		summarizeBy: none
+		sourceColumn: seller_state
+
+	column customer_state
+		dataType: string
+		lineageTag: b08bd6bf-398b-5c8f-a190-9ca359f5f7f0
+		summarizeBy: none
+		sourceColumn: customer_state
+
+	column lane
+		dataType: string
+		lineageTag: d9877b41-066b-550b-b3fa-2063f3d047a2
+		summarizeBy: none
+		sourceColumn: lane
+
+	column orders
+		dataType: int64
+		lineageTag: 8a94baa3-93f9-56b7-ba1a-1e58b1493389
+		summarizeBy: none
+		sourceColumn: orders
+
+	column p50_delivery_days
+		dataType: int64
+		lineageTag: 657d5fe5-4cbf-538e-873e-3aebe8b0b892
+		summarizeBy: none
+		sourceColumn: p50_delivery_days
+
+	column p90_delivery_days
+		dataType: int64
+		lineageTag: 8b6f8866-ea44-503e-baf3-e0d160092a81
+		summarizeBy: none
+		sourceColumn: p90_delivery_days
+
+	column p95_delivery_days
+		dataType: int64
+		lineageTag: 94066313-bafa-53b0-96b2-882c5349461d
+		summarizeBy: none
+		sourceColumn: p95_delivery_days
+
+	column avg_promised_days
+		dataType: double
+		lineageTag: 72956499-7cc5-5266-87d9-ed3ce6d275cf
+		summarizeBy: none
+		sourceColumn: avg_promised_days
+
+	column on_time_pct_today
+		dataType: double
+		lineageTag: b844cd81-18a0-54e9-8bbf-7eaa51bdef77
+		summarizeBy: none
+		sourceColumn: on_time_pct_today
+
+	column on_time_pct_at_p90
+		dataType: double
+		lineageTag: d6059aa5-8489-534e-a490-170ea5c78335
+		summarizeBy: none
+		sourceColumn: on_time_pct_at_p90
+
+	column on_time_pct_at_p95
+		dataType: double
+		lineageTag: 90a7e2f7-5189-5e4b-be01-9e10915b5f81
+		summarizeBy: none
+		sourceColumn: on_time_pct_at_p95
+
+	column gap_p90_vs_avg_promise_days
+		dataType: double
+		lineageTag: 523dcf11-5a8c-5758-992f-f16f3d7d9da1
+		summarizeBy: none
+		sourceColumn: gap_p90_vs_avg_promise_days
+
+	column gap_p95_vs_avg_promise_days
+		dataType: double
+		lineageTag: 5a3f2985-a9a7-511e-939e-5360fa9f7079
+		summarizeBy: none
+		sourceColumn: gap_p95_vs_avg_promise_days
+
+	partition lane_lead_time = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "lane_lead_time.parquet"))
+				in
+				    Source
+

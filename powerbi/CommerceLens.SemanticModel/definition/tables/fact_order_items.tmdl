@@ -1,0 +1,50 @@
+table fact_order_items
+	lineageTag: 5cdafa3d-4309-58fa-9de3-1b6c99e9960b
+
+	column order_id
+		dataType: string
+		isHidden
+		lineageTag: 0462a30b-2179-5244-aeea-0c831d4be264
+		summarizeBy: none
+		sourceColumn: order_id
+
+	column order_item_id
+		dataType: int64
+		lineageTag: 72ef6052-73c0-5821-bf27-b94882cf4248
+		summarizeBy: none
+		sourceColumn: order_item_id
+
+	column product_id
+		dataType: string
+		isHidden
+		lineageTag: 5f9cbb89-061a-594b-a702-cd60830ec4c2
+		summarizeBy: none
+		sourceColumn: product_id
+
+	column seller_id
+		dataType: string
+		isHidden
+		lineageTag: f76cb644-4ff6-593e-bf07-c092f51858ff
+		summarizeBy: none
+		sourceColumn: seller_id
+
+	column price
+		dataType: double
+		lineageTag: 62497796-5e89-593b-9e78-c3e5f917cfff
+		summarizeBy: none
+		sourceColumn: price
+
+	column freight_value
+		dataType: double
+		lineageTag: 7d937cef-a8a7-5757-a457-9caef82e46ed
+		summarizeBy: none
+		sourceColumn: freight_value
+
+	partition fact_order_items = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "fact_order_items.parquet"))
+				in
+				    Source
+

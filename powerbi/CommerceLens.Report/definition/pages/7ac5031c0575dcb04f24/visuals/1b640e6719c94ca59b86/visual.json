@@ -1,0 +1,57 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "1b640e6719c94ca59b86",
+  "position": {
+    "x": 22.807017543859651,
+    "y": 263.15789473684214,
+    "z": 0,
+    "height": 817.54385964912285,
+    "width": 1131.578947368421,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "clusteredColumnChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_orders"
+                    }
+                  },
+                  "Property": "delay_bucket"
+                }
+              },
+              "queryRef": "fact_orders.delay_bucket",
+              "nativeQueryRef": "delay_bucket",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Measures"
+                    }
+                  },
+                  "Property": "Low Review %"
+                }
+              },
+              "queryRef": "_Measures.Low Review %",
+              "nativeQueryRef": "Low Review %"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

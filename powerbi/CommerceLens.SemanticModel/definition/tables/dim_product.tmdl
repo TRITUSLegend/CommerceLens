@@ -1,0 +1,29 @@
+table dim_product
+	lineageTag: cf0aec8d-94c2-52cd-9b82-034023174012
+
+	column product_id
+		dataType: string
+		lineageTag: deef2bc3-e1cb-509e-9605-63fddd6f75d9
+		summarizeBy: none
+		sourceColumn: product_id
+
+	column category
+		dataType: string
+		lineageTag: 9e4d9815-cbc2-5776-bdf8-3518cc1318b1
+		summarizeBy: none
+		sourceColumn: category
+
+	column product_weight_g
+		dataType: int64
+		lineageTag: 5d0a6f0d-eadc-5a7b-9a2f-a2e4d7c98514
+		summarizeBy: none
+		sourceColumn: product_weight_g
+
+	partition dim_product = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "dim_product.parquet"))
+				in
+				    Source
+

@@ -1,0 +1,34 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBI_QueryOrder = ["fact_orders","fact_order_items","dim_customer","dim_product","dim_seller","dim_state","dim_date","recon_sql","recon_seller_state","lane_lead_time","model_metrics","model_capture_curve","shap_importance","shap_state_effect","model_curves","model_target_comparison","DataFolder"]
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table _Measures
+ref table fact_orders
+ref table fact_order_items
+ref table dim_customer
+ref table dim_product
+ref table dim_seller
+ref table dim_state
+ref table dim_date
+ref table recon_sql
+ref table recon_seller_state
+ref table lane_lead_time
+ref table model_metrics
+ref table model_capture_curve
+ref table shap_importance
+ref table shap_state_effect
+ref table model_curves
+ref table model_target_comparison
+ref table 'Late Cut'
+ref table 'Flag %'
+

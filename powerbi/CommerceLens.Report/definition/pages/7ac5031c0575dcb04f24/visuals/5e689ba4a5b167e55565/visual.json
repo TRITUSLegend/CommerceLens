@@ -1,0 +1,66 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "5e689ba4a5b167e55565",
+  "position": {
+    "x": 863.1578947368422,
+    "y": 40.350877192982459,
+    "z": 5000,
+    "height": 208.77192982456143,
+    "width": 708.77192982456143,
+    "tabOrder": 5000
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Measures"
+                    }
+                  },
+                  "Property": "Orders Rescued (what-if)"
+                }
+              },
+              "queryRef": "_Measures.Orders Rescued (what-if)",
+              "nativeQueryRef": "Orders Rescued (what-if)"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Measures"
+                    }
+                  },
+                  "Property": "Low Reviews Avoided (upper bound)"
+                }
+              },
+              "queryRef": "_Measures.Low Reviews Avoided (upper bound)",
+              "nativeQueryRef": "Low Reviews Avoided (upper bound)"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Measures"
+                    }
+                  },
+                  "Property": "Low Reviews Avoided % (upper bound)"
+                }
+              },
+              "queryRef": "_Measures.Low Reviews Avoided % (upper bound)",
+              "nativeQueryRef": "Low Reviews Avoided % (upper bound)"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

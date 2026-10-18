@@ -1,0 +1,15 @@
+table 'Late Cut'
+	lineageTag: 724925dd-2674-5d4a-ade4-06db85fe4c88
+
+	column 'Late Cut %'
+		dataType: int64
+		formatString: 0
+		lineageTag: 89d76357-bab6-5bef-9c03-861105ac9550
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Late Cut %]
+
+	partition 'Late Cut' = calculated
+		mode: import
+		source = SELECTCOLUMNS ( GENERATESERIES ( 0, 100, 5 ), "Late Cut %", [Value] )
+

@@ -1,0 +1,13 @@
+{
+  "name": "CommerceLens",
+  "dataColors": ["#2a78d6", "#8a94a6", "#1b4f8a", "#7fb0ea", "#4a5160", "#c5ccd6"],
+  "background": "#ffffff",
+  "foreground": "#252423",
+  "tableAccent": "#2a78d6",
+  "good": "#2a78d6",
+  "neutral": "#8a94a6",
+  "bad": "#eb6834",
+  "maximum": "#2a78d6",
+  "center": "#c5ccd6",
+  "minimum": "#ffffff"
+}

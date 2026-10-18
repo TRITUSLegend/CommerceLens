@@ -1,0 +1,35 @@
+table model_curves
+	lineageTag: deccce7f-f9f0-51b7-a45e-4d3658e82575
+
+	column model
+		dataType: string
+		lineageTag: c80322f6-43f2-5366-b386-4f0651d70657
+		summarizeBy: none
+		sourceColumn: model
+
+	column curve
+		dataType: string
+		lineageTag: b591b7b3-4cc1-594d-a4a5-12699d6dae95
+		summarizeBy: none
+		sourceColumn: curve
+
+	column x
+		dataType: double
+		lineageTag: 379f7212-9228-52d3-8802-ecff7ebaa7a9
+		summarizeBy: sum
+		sourceColumn: x
+
+	column y
+		dataType: double
+		lineageTag: 5d32fefb-9672-539c-978a-d31dc1641c6b
+		summarizeBy: sum
+		sourceColumn: y
+
+	partition model_curves = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "model_curves.parquet"))
+				in
+				    Source
+

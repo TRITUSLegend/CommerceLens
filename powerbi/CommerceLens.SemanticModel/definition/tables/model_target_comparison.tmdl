@@ -1,0 +1,59 @@
+table model_target_comparison
+	lineageTag: 2fe3afc1-3963-5234-abdd-82ee4224d08d
+
+	column target
+		dataType: string
+		lineageTag: 1d632eee-7e54-5cee-b3d4-e8faca0c4999
+		summarizeBy: none
+		sourceColumn: target
+
+	column rows
+		dataType: int64
+		lineageTag: dc5555d6-3655-5fe5-b80c-de1c6c031b01
+		summarizeBy: sum
+		sourceColumn: rows
+
+	column positive_rate
+		dataType: double
+		lineageTag: de5ebff1-47eb-58b1-8060-58bebeb0f206
+		summarizeBy: sum
+		sourceColumn: positive_rate
+
+	column roc_auc
+		dataType: double
+		lineageTag: 175094c9-b085-56c1-904c-f7a861a4bad5
+		summarizeBy: sum
+		sourceColumn: roc_auc
+
+	column pr_auc
+		dataType: double
+		lineageTag: c5219b86-1871-5e4b-b7f5-3defadeecd31
+		summarizeBy: sum
+		sourceColumn: pr_auc
+
+	column pr_auc_lift
+		dataType: double
+		lineageTag: 87488495-d92c-5f51-ad62-1057708a3a66
+		summarizeBy: sum
+		sourceColumn: pr_auc_lift
+
+	column precision_top10
+		dataType: double
+		lineageTag: 2d44d362-b2cc-522a-8a56-bcbe225b4f69
+		summarizeBy: sum
+		sourceColumn: precision_top10
+
+	column recall_top10
+		dataType: double
+		lineageTag: 11eaffa7-794d-5f75-aff8-a8dff82e93dc
+		summarizeBy: sum
+		sourceColumn: recall_top10
+
+	partition model_target_comparison = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "model_target_comparison.parquet"))
+				in
+				    Source
+

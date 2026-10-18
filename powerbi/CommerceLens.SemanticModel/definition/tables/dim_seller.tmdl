@@ -1,0 +1,35 @@
+table dim_seller
+	lineageTag: 9180d605-ac65-544f-89cf-8472d2dc2d19
+
+	column seller_id
+		dataType: string
+		lineageTag: 7b7b9763-1bbf-57cf-bca5-981799b6baf0
+		summarizeBy: none
+		sourceColumn: seller_id
+
+	column seller_state
+		dataType: string
+		lineageTag: 2abc886b-f76c-579e-8e7e-df774bdff7f4
+		summarizeBy: none
+		sourceColumn: seller_state
+
+	column seller_city
+		dataType: string
+		lineageTag: d80cea5d-d765-5b68-9244-962bd565416e
+		summarizeBy: none
+		sourceColumn: seller_city
+
+	column seller_tier
+		dataType: string
+		lineageTag: 524a919c-162c-5036-b6b5-4eb7eb47affa
+		summarizeBy: none
+		sourceColumn: seller_tier
+
+	partition dim_seller = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "dim_seller.parquet"))
+				in
+				    Source
+

@@ -1,9 +1,10 @@
 # CommerceLens in Power BI — rebuild notes
 
-These notes describe how to rebuild the Streamlit dashboard (`dashboard/app.py`) in Power BI Desktop by hand. There are two routes:
+These notes describe how to rebuild the Streamlit dashboard (`dashboard/app.py`) in Power BI Desktop. There are three routes:
 
+- **Route C: SQL export plus scope flags (recommended).** `scripts/build_powerbi_data.py` exports a star schema from the same DuckDB views the notebooks use, with the SQL scope rules precomputed as 0/1 flags. The measures in [`powerbi/dax_measures.md`](../powerbi/dax_measures.md) are reconciled against SQL. See [Route C](#route-c-sql-export-plus-scope-flags-recommended).
 - **Route A: pre-aggregated (fastest).** Load the parquet files in `dashboard/data/`. Every number matches the Streamlit app exactly, because both read the same files.
-- **Route B: star schema from the raw CSVs.** Build a proper model with DAX measures. This takes longer, but it shows Power BI modelling skills, and slicers work across every visual.
+- **Route B: star schema from the raw CSVs.** Build the model in Power Query from the CSVs. This re-implements the SQL definitions by hand, so each one has to be copied exactly (the notes below were corrected where they did not match the SQL).
 
 Definitions used everywhere, and they must stay the same in Power BI:
 
@@ -12,8 +13,66 @@ Definitions used everywhere, and they must stay the same in Power BI:
 | Revenue | `SUM(order_items.price)` on orders with `order_status = "delivered"` (freight excluded) |
 | Customer | `customers.customer_unique_id` (Olist creates a new `customer_id` per order) |
 | Late | `order_delivered_customer_date` later than `order_estimated_delivery_date` (compared as dates) |
-| Low review | `review_score <= 2`, using the latest review per order |
+| Low review | `review_score <= 2`, using the latest review per order (latest `review_answer_timestamp`, then latest `review_creation_date`) |
 | Repeat customer | 2+ delivered orders |
+| Category | English name, else the Portuguese name (2 categories have no translation), else "unknown" |
+| Customer state | The state on the **order** (via `customer_id`), not a per-person attribute: 39 people have orders in more than one state |
+
+### Late rate: three numbers, two denominators
+
+The project quotes three late rates. They are all correct; they answer different questions.
+
+| Figure | Numerator / denominator | Population | Where it appears |
+|---|---|---|---|
+| 6.66% | 6,381 / 95,824 | Delivered, with a delivery date, **with a review** (`sql/12`) | README "6.7% of orders" (key finding, finding 1); `Late % (reviewed)`; the denominator of every late-vs-review comparison |
+| 6.77% | 6,534 / 96,470 | Delivered, with a delivery date (`sql/10`) | KPI card, `Late %`, Reconciliation page |
+| 6.8% | order-weighted mean of the 27 state rates in `sql/14` = 6.7714% | The same 96,470 orders as 6.77% | README finding 2 ("national late rate"), computed in `02_insights.ipynb` |
+
+So 6.66% and 6.77% differ in denominator: the 646 delivered orders with a delivery date but no review
+are in 6.77% only. 6.8% has the same denominator as 6.77%; it is 6.7714% (the average of state rates
+already rounded to 2 decimals) printed to one decimal. In Power BI, use `Late % (reviewed)` next to
+any review metric and `Late %` for the operational KPI, and label which one a visual shows.
+
+---
+
+## Route C: SQL export plus scope flags (recommended)
+
+```powershell
+.venv-powerbi\Scripts\python scripts/build_powerbi_data.py       # powerbi/data/*.parquet + integrity checks
+.venv-powerbi\Scripts\python scripts/verify_powerbi_measures.py  # pandas mirror of every DAX measure vs SQL
+.venv-powerbi\Scripts\python scripts/build_powerbi_tmdl.py       # TMDL semantic model (opens in Desktop; see powerbi/README.md)
+```
+
+- **Tables:** `fact_orders`, `fact_order_items`, `dim_customer`, `dim_product`, `dim_seller`,
+  `dim_state`, `dim_date`, plus `recon_sql` / `recon_seller_state` (SQL reference values) and the six
+  Model page tables. Every column is described in
+  [`powerbi_data_dictionary.md`](powerbi_data_dictionary.md).
+- **Scope flags** reproduce the SQL `WHERE` clauses: `is_delivered`, `in_delay_scope` (delivered with
+  a delivery date: `sql/10` late %, `sql/14`), `in_review_scope` (also reviewed: `sql/11`, `sql/12`,
+  `sql/15`), `is_late`, `is_low_review`. Measures filter on these 0/1 values, so none compares a
+  column with BLANK (which DAX treats as equal to 0).
+- **Integrity checks** run on every export: one row per order, unique dimension keys, no orphan
+  foreign keys for the six relationships, scope flags nest, item revenue equals `sql/10` revenue,
+  and the Model page files are byte-identical copies.
+- **Measures** live in [`powerbi/dax_measures.md`](../powerbi/dax_measures.md), with the SQL file
+  each one mirrors. The build guide is [`powerbi_build_checklist.md`](powerbi_build_checklist.md).
+
+### Reconciliation scope: what the checks prove and what they do not
+
+`scripts/verify_powerbi_measures.py` and the Reconciliation page test the **DAX layer against the
+SQL layer**: measure logic, scope filters, the six relationships and filter propagation (for example
+`dim_state` → `fact_orders` → `fact_order_items`, and `CROSSFILTER` from sellers or products back to
+orders). A match means Power BI reproduces what SQL computes.
+
+They do **not** re-derive the SQL inputs independently. `delay_days`, `delivery_days`, the latest
+review per order, the English category and the RFM segments are computed in `sql/00` and `sql/08`
+and exported as columns, so an error there would appear identically in both layers. The SQL itself
+is checked separately: section A of the script confirms the export equals the committed Streamlit
+outputs, and the notebooks print every figure in the README.
+
+The pandas mirror reproduces DAX semantics (CALCULATE filter replacement, context transition,
+BLANK handling, single-direction relationships) but is not the DAX engine, so measures are labelled
+LOGIC-CHECKED until the Reconciliation page shows "Match" in Power BI Desktop.
 
 ---
 
@@ -42,16 +101,15 @@ On Route A, measures are simple aggregations of already-computed columns (for ex
 | Table | CSV | Power Query steps |
 |---|---|---|
 | `FactOrderItems` | `olist_order_items_dataset.csv` | Types: price and freight_value as Decimal |
-| `FactOrders` | `olist_orders_dataset.csv` | Merge `customers` to add `customer_unique_id` and `customer_state`. Add `DelayDays = Duration.Days(Date.From([order_delivered_customer_date]) - Date.From([order_estimated_delivery_date]))` and `DeliveryDays` the same way from purchase to delivered |
-| `Reviews` | `olist_order_reviews_dataset.csv` | Group by `order_id` and keep the row with the max `review_answer_timestamp` (latest review per order) |
-| `DimProduct` | `olist_products_dataset.csv` | Merge `product_category_name_translation` to get the English category; replace nulls with "unknown" |
+| `FactOrders` | `olist_orders_dataset.csv` | Merge `customers` on `customer_id` to add `customer_unique_id` and `customer_state` (the order's state). Add `DelayDays = Duration.Days(Date.From([order_delivered_customer_date]) - Date.From([order_estimated_delivery_date]))` and `DeliveryDays` the same way from purchase to delivered. Merge `FactOrderItems` grouped by `order_id` to add `ItemsValue` = sum of `price` (null when the order has no items). Merge the latest review (next row) to add `review_score` |
+| `Reviews` (staging, not loaded) | `olist_order_reviews_dataset.csv` | Sort by `review_answer_timestamp` descending, then `review_creation_date` descending, and keep the first row per `order_id` (547 orders have more than one review). Merge `review_score` into `FactOrders` instead of loading a separate table: a 1:1 relationship in Power BI always filters in both directions |
+| `DimProduct` | `olist_products_dataset.csv` | Merge `product_category_name_translation`. Category = English name if present, **else the Portuguese name**, else "unknown" (as `sql/00`). Replacing every missing translation with "unknown" would fold `pc_gamer` and `portateis_cozinha_e_preparadores_de_alimentos` into "unknown" (72 categories instead of 74) |
 | `DimSeller` | `olist_sellers_dataset.csv` | Keep zip prefix as **Text** |
-| `DimCustomer` | `olist_customers_dataset.csv` | Keep zip prefix as **Text**; distinct on `customer_unique_id` for a person-level dimension |
+| `DimCustomer` | `olist_customers_dataset.csv` | Keep zip prefix as **Text**; distinct on `customer_unique_id` for a person-level dimension. Do not take state from here: use `FactOrders[customer_state]` |
 | `DimDate` | DAX `CALENDAR(DATE(2016,9,1), DATE(2018,10,31))` | Add Year, Month, YearMonth |
 
 ### Relationships (single direction, one-to-many)
 - `FactOrders[order_id]` 1 → * `FactOrderItems[order_id]`
-- `FactOrders[order_id]` 1 → 1 `Reviews[order_id]`
 - `DimProduct[product_id]` 1 → * `FactOrderItems[product_id]`
 - `DimSeller[seller_id]` 1 → * `FactOrderItems[seller_id]`
 - `DimCustomer[customer_unique_id]` 1 → * `FactOrders[customer_unique_id]`
@@ -63,7 +121,10 @@ Delivered Orders = CALCULATE(DISTINCTCOUNT(FactOrders[order_id]), FactOrders[ord
 
 Revenue = CALCULATE(SUM(FactOrderItems[price]), FactOrders[order_status] = "delivered")
 
-Avg Order Value = DIVIDE([Revenue], [Delivered Orders])
+// SQL (sql/10): AVG(items_value) over delivered orders, NULLs skipped. AVERAGE skips BLANKs
+// the same way. DIVIDE([Revenue], [Delivered Orders]) gives the same 137.04 on this data only
+// because every delivered order has items; it would count an order without items.
+Avg Order Value = CALCULATE(AVERAGE(FactOrders[ItemsValue]), FactOrders[order_status] = "delivered")
 
 Customers = CALCULATE(DISTINCTCOUNT(FactOrders[customer_unique_id]), FactOrders[order_status] = "delivered")
 
@@ -77,10 +138,17 @@ RETURN DIVIDE(COUNTROWS(FILTER(PerCustomer, [n] >= 2)), COUNTROWS(PerCustomer))
 Late Orders = CALCULATE([Delivered Orders], FactOrders[DelayDays] > 0)
 Late % = DIVIDE([Late Orders], CALCULATE([Delivered Orders], NOT ISBLANK(FactOrders[DelayDays])))
 
-Avg Review = CALCULATE(AVERAGE(Reviews[review_score]), FactOrders[order_status] = "delivered")
-Low Review % = DIVIDE(
-    CALCULATE(COUNTROWS(Reviews), Reviews[review_score] <= 2, FactOrders[order_status] = "delivered"),
-    CALCULATE(COUNTROWS(Reviews), FactOrders[order_status] = "delivered"))
+Avg Review = CALCULATE(AVERAGE(FactOrders[review_score]), FactOrders[order_status] = "delivered")
+
+// SQL scope (sql/11, sql/12, sql/14): delivered, WITH a delivery date, with a review. Leaving out
+// the delivery-date condition adds 8 orders to the denominator. Keep NOT ISBLANK on review_score:
+// BLANK <= 2 is TRUE in DAX, so unreviewed orders would otherwise count as low reviews.
+Low Review % =
+CALCULATE(
+    DIVIDE(COUNTROWS(FILTER(FactOrders, FactOrders[review_score] <= 2)), COUNTROWS(FactOrders)),
+    FactOrders[order_status] = "delivered",
+    NOT ISBLANK(FactOrders[DelayDays]),
+    NOT ISBLANK(FactOrders[review_score]))
 
 Freight % of Price = DIVIDE(
     CALCULATE(SUM(FactOrderItems[freight_value]), FactOrders[order_status] = "delivered"), [Revenue])
@@ -120,7 +188,7 @@ Use one accent colour (blue `#2a78d6`), orange `#eb6834` only for "late / above 
 - Table: `rfm_segments`.
 
 **4. Satisfaction drivers**
-- Late-delivery what-if: a numeric-range parameter `Cut %` (0–100). The measure `Low reviews avoided = late_orders × Cut% × (late low-review rate − on-time low-review rate)` uses the values in `late_vs_ontime`. Label it as an upper bound.
+- Late-delivery what-if: a numeric-range parameter `Cut %` (0–100). The measure `Low reviews avoided = late_orders × Cut% × (late low-review rate − on-time low-review rate)` uses the values in `late_vs_ontime` (Route A) or the `Low Review % (Late)` / `Low Review % (On time)` measures (Route C, see `powerbi/dax_measures.md`). Label it as an upper bound.
 - Column: Low Review % by DelayBucket (conditional formatting: late buckets orange).
 - Cards: Late %, Low Review % for late vs on-time orders.
 - Scatter: customer state, x = Late %, y = Low Review %, size = Delivered Orders.

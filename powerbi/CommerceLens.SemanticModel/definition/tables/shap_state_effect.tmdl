@@ -1,0 +1,29 @@
+table shap_state_effect
+	lineageTag: 55d97606-a870-56f8-b441-497d7e7099a4
+
+	column customer_state
+		dataType: string
+		lineageTag: 4958482d-d195-5eee-8542-e773fee8c9ff
+		summarizeBy: none
+		sourceColumn: customer_state
+
+	column mean_shap
+		dataType: double
+		lineageTag: 439c346f-ab98-5b1f-8cb3-3ae6e36e0c6c
+		summarizeBy: sum
+		sourceColumn: mean_shap
+
+	column orders
+		dataType: int64
+		lineageTag: ee5bdfcb-6a96-52fd-b208-c9216e3185c1
+		summarizeBy: sum
+		sourceColumn: orders
+
+	partition shap_state_effect = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(DataFolder & "shap_state_effect.parquet"))
+				in
+				    Source
+
