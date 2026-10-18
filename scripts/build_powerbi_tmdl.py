@@ -5,7 +5,7 @@ Usage (from the repo root, after scripts/build_powerbi_data.py):
 
 Writes powerbi/CommerceLens.SemanticModel/definition/:
     model.tmdl          model settings and table order
-    expressions.tmdl    the DataFolder parameter (absolute path to powerbi/data/)
+    expressions.tmdl    the DataFolder parameter (a placeholder; set the path in Desktop)
     relationships.tmdl  the six one-to-many, single-direction relationships
     tables/*.tmdl       one file per table: columns from the parquet schema, a
                         Parquet.Document partition, sort-by-column settings, the date
@@ -74,6 +74,10 @@ HIDDEN = {
 NO_IMPLICIT_SUM = {"fact_orders", "fact_order_items", "dim_customer", "dim_product",
                    "dim_seller", "dim_state", "dim_date", "recon_sql", "recon_seller_state",
                    "lane_lead_time"}
+
+# Never a real path: the absolute path of powerbi/data/ differs per machine and would publish
+# the local user name. It is set in Desktop (Transform data > Edit parameters > DataFolder).
+DATA_FOLDER_PLACEHOLDER = "REPLACE_WITH_FULL_PATH_TO\\powerbi\\data\\"
 
 ARROW_TO_TMDL = {"string": "string", "large_string": "string", "double": "double", "float": "double",
                  "int64": "int64", "int32": "int64", "bool": "boolean", "date32[day]": "dateTime"}
@@ -320,9 +324,8 @@ def main() -> int:
                 f"\tfromColumn: {many}.{mc}", f"\ttoColumn: {one}.{oc}", ""]
     (OUT / "relationships.tmdl").write_text("\n".join(rel), encoding="utf-8")
 
-    folder = str(DATA) + "\\"
     (OUT / "expressions.tmdl").write_text(
-        f'expression DataFolder = "{folder}" meta [IsParameterQuery=true, Type="Text", '
+        f'expression DataFolder = "{DATA_FOLDER_PLACEHOLDER}" meta [IsParameterQuery=true, Type="Text", '
         f'IsParameterQueryRequired=true]\n\tlineageTag: {tag("expression", "DataFolder")}\n\n'
         "\tannotation PBI_ResultType = Text\n", encoding="utf-8")
 
@@ -337,7 +340,7 @@ def main() -> int:
 
     print(f"Wrote {len(table_order)} tables, {len(RELATIONSHIPS)} relationships, {len(measures)} measures "
           f"to {OUT.relative_to(ROOT)}")
-    print(f"DataFolder parameter = {folder}")
+    print(f"DataFolder parameter = {DATA_FOLDER_PLACEHOLDER} (placeholder; set it in Desktop)")
     print("STATUS: UNTESTED (never opened in Power BI Desktop). See powerbi/README.md.")
     return 0
 
