@@ -40,7 +40,7 @@ any review metric and `Late %` for the operational KPI, and label which one a vi
 ```powershell
 .venv-powerbi\Scripts\python scripts/build_powerbi_data.py       # powerbi/data/*.parquet + integrity checks
 .venv-powerbi\Scripts\python scripts/verify_powerbi_measures.py  # pandas mirror of every DAX measure vs SQL
-.venv-powerbi\Scripts\python scripts/build_powerbi_tmdl.py       # TMDL semantic model (untested in Desktop)
+.venv-powerbi\Scripts\python scripts/build_powerbi_tmdl.py       # TMDL semantic model (opens in Desktop; see powerbi/README.md)
 ```
 
 - **Tables:** `fact_orders`, `fact_order_items`, `dim_customer`, `dim_product`, `dim_seller`,
