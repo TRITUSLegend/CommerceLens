@@ -122,6 +122,17 @@ Deployment notes:
 - The theme lives in `.streamlit/config.toml`.
 - To rebuild the dashboard in Power BI, see [`docs/powerbi_notes.md`](docs/powerbi_notes.md).
 
+## Power BI layer
+
+A Power BI semantic model on the same SQL definitions as the notebooks and the dashboard, with every DAX measure reconciled against SQL.
+
+- **Export:** `scripts/build_powerbi_data.py` builds a star schema (`fact_orders`, `fact_order_items`, five dimensions) from the DuckDB views, with the SQL scope rules as 0/1 flags so no measure compares against BLANK. Integrity checks run on every export: unique keys, no orphan foreign keys, revenue ties out to `sql/10`.
+- **Measures:** [`powerbi/dax_measures.md`](powerbi/dax_measures.md) holds KPIs, category Pareto, month-over-month growth, delay buckets, lateness by customer and seller state, the freight test, the late-delivery what-if (upper bound), RFM and the model page. Each names the SQL file it mirrors.
+- **Reconciliation:** `scripts/verify_powerbi_measures.py` re-implements each measure in pandas with the model's filter context and relationships, then compares it with SQL (919/919 checks match). A Reconciliation page in the report shows the 14 headline measures next to their SQL values.
+- **Model as code:** `scripts/build_powerbi_tmdl.py` generates the TMDL semantic model in `powerbi/CommerceLens.SemanticModel/`.
+
+Status: the export and the SQL comparisons are verified; the DAX measures are logic-checked in pandas but not yet executed in Power BI Desktop; the TMDL files have not been opened in Desktop. The reconciliation tests the DAX layer against SQL (measure logic, relationships, filter propagation); it does not re-derive SQL inputs such as `delay_days`. Details: [`docs/powerbi_notes.md`](docs/powerbi_notes.md) (routes, reconciliation scope, why the late rate appears as 6.66%, 6.77% and 6.8%), [`docs/powerbi_requirements_map.md`](docs/powerbi_requirements_map.md), [`docs/powerbi_data_dictionary.md`](docs/powerbi_data_dictionary.md), [`docs/powerbi_build_checklist.md`](docs/powerbi_build_checklist.md). The Power BI scripts run in a separate Python 3.13 environment ([`powerbi/README.md`](powerbi/README.md)).
+
 ## Repository structure
 
 ```
@@ -130,14 +141,19 @@ src/config.py                  DATA_DIR (repo root by default; env COMMERCELENS_
 src/db.py                      DuckDB: CSVs as views, run sql/ files
 src/features.py                purchase-time model datasets
 src/model.py                   LightGBM / baseline training, metrics, SHAP
-sql/                           00–20 query files (loaded by notebooks and the build script)
+sql/                           00–21 query files (loaded by notebooks and the build scripts)
 notebooks/01_sql_analytics     Layer 1
 notebooks/02_insights          Layer 2
 notebooks/03_model             Layer 3
 scripts/build_dashboard_data.py  CSVs -> dashboard/data/*.parquet
 dashboard/app.py               Streamlit app (+ slim requirements.txt for deployment)
 .streamlit/config.toml         dashboard theme
-docs/powerbi_notes.md          Power BI rebuild guide
+scripts/build_powerbi_data.py      CSVs -> powerbi/data/*.parquet (star schema + integrity checks)
+scripts/verify_powerbi_measures.py pandas mirror of every DAX measure vs SQL
+scripts/build_powerbi_tmdl.py      TMDL semantic model from the parquet schemas + DAX file
+powerbi/                       DAX measures, TMDL model, theme, Python 3.13 env pins
+docs/powerbi_notes.md          Power BI rebuild guide (routes, reconciliation scope, late-rate note)
+docs/powerbi_*.md              requirements map, data dictionary, build checklist
 ```
 
 ## Tech stack
