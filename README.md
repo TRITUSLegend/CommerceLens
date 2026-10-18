@@ -134,6 +134,29 @@ A Power BI semantic model on the same SQL definitions as the notebooks and the d
 
 Status: the export and SQL comparisons are verified. In Power BI Desktop the project opens, all tables load, and the 14 reconciliation measures reproduce the SQL values (14/14 Match). The what-if simulator (50% and 100% cuts), the category Pareto (rank 17 = 79.69% cumulative, matching SQL), the revenue-by-category and by-state rankings and the late/low-review-by-delay-bucket chart were also checked against SQL in Desktop. Other measures (month-on-month growth, seller-state, freight, seller tiers, model-page and colour measures) are logic-checked in pandas but have not been run in Desktop. The report has five pages (Reconciliation, Overview, Satisfaction drivers, Revenue, Customers & RFM); a PDF export is in [`docs/powerbi/CommerceLens.pdf`](docs/powerbi/CommerceLens.pdf). Risk model, Findings and lead-time pages are not built. The reconciliation tests the DAX layer against SQL (measure logic, relationships, filter propagation); it does not re-derive SQL inputs such as delay_days. Details: [`docs/powerbi_notes.md`](docs/powerbi_notes.md) (routes, reconciliation scope, why the late rate appears as 6.66%, 6.77% and 6.8%), [`docs/powerbi_requirements_map.md`](docs/powerbi_requirements_map.md), [`docs/powerbi_data_dictionary.md`](docs/powerbi_data_dictionary.md), [`docs/powerbi_build_checklist.md`](docs/powerbi_build_checklist.md). The Power BI scripts run in a separate Python 3.13 environment ([`powerbi/README.md`](powerbi/README.md)).
 
+### Report pages
+
+Screenshots of the five report pages (the same pages are in [`docs/powerbi/CommerceLens.pdf`](docs/powerbi/CommerceLens.pdf)).
+
+**Reconciliation:** every DAX measure checked against the SQL layer, 14 of 14 match.
+
+![Reconciliation page](docs/powerbi/screenshots/01-reconciliation.png)
+
+**Overview:** headline KPIs with monthly revenue and late-delivery trends (sparse edge months excluded).
+
+![Overview page](docs/powerbi/screenshots/02-overview.png)
+
+**Satisfaction drivers:** low-review rate by delivery delay, late vs on-time orders, and the late-delivery what-if simulator (an upper bound, shown at a 50% cut).
+
+![Satisfaction drivers page](docs/powerbi/screenshots/03-satisfaction-drivers.png)
+
+**Revenue:** top-15 categories, revenue by state and the category Pareto curve with the 80% line.
+
+![Revenue page](docs/powerbi/screenshots/04-revenue.png)
+
+**Customers and RFM:** customers and revenue by RFM segment.
+
+![Customers and RFM page](docs/powerbi/screenshots/05-customers-rfm.png)
 ## Repository structure
 
 ```
