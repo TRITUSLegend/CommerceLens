@@ -11,8 +11,13 @@ Model.masks), then the results are compared with the SQL layer:
     A  SQL export vs Streamlit build   recon_sql vs dashboard/data/*.parquet
     B  Core measures (14)              pandas mirror of each DAX measure vs recon_sql
     C  Relationship propagation        dim_state -> fact_orders -> fact_order_items vs sql/05
+    D  Report-page measures            each sliced like its visual, vs the SQL file it mirrors:
+                                       D1 sql/03 Pareto, D2 sql/06 monthly + MoM, D3 sql/11
+                                       delay buckets, D4 sql/14 customer state, D5 sql/21
+                                       seller state, D6 sql/13 category, D7 sql/15 freight,
+                                       D8 Streamlit what-if, D9 sql/09 RFM segments
 
-A pass in B or C means the measure's LOGIC (filters, scope flags, relationships)
+A pass in B, C or D means the measure's LOGIC (filters, scope flags, relationships)
 reproduces SQL. The DAX itself is not executed, so those measures are
 LOGIC-CHECKED, not VERIFIED. Section A compares two SQL outputs directly, so it is
 VERIFIED. Exit code 0 when every check matches, 1 otherwise.
@@ -24,6 +29,7 @@ re-derive delay_days, latest review or category, which come from sql/00.
 import math
 import sys
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -100,6 +106,19 @@ class Model:
 
     def __init__(self, data_dir: Path):
         self.t = {name: pd.read_parquet(data_dir / f"{name}.parquet") for name in MODEL_TABLES}
+        # Integer codes for each relationship key (position in the one-side table's key
+        # list, -1 when absent) so propagation is an array lookup, not a string match.
+        self.codes, self.n_keys = {}, {}
+        for one, (key, many, fk) in RELATIONSHIPS.items():
+            keys = pd.Index(self.t[one][key].unique())
+            self.n_keys[one] = len(keys)
+            self.codes[(one, "one")] = keys.get_indexer(self.t[one][key])
+            self.codes[(one, "many")] = keys.get_indexer(self.t[many][fk])
+
+    def _allowed(self, one: str, visible_codes: np.ndarray) -> np.ndarray:
+        allowed = np.zeros(self.n_keys[one] + 1, dtype=bool)   # last slot catches -1 (orphans)
+        allowed[visible_codes[visible_codes >= 0]] = True
+        return allowed
 
     def masks(self, ctx: Ctx) -> dict:
         """Visible rows of every table under ctx, after relationship propagation."""
@@ -112,11 +131,12 @@ class Model:
             mask[name], filtered[name] = m, bool(preds)
 
         def push(one: str) -> None:
-            """Filter flows from the one side to the many side (single direction)."""
-            key, many, fk = RELATIONSHIPS[one]
+            """Filter flows from the one side to the many side (single direction): a
+            many-side row stays visible only if its key is among the visible one-side keys."""
+            many = RELATIONSHIPS[one][1]
             if filtered[one]:
-                keep = self.t[one].loc[mask[one], key]
-                mask[many] &= self.t[many][fk].isin(keep).to_numpy()
+                allowed = self._allowed(one, self.codes[(one, "one")][mask[one]])
+                mask[many] &= allowed[self.codes[(one, "many")]]
                 filtered[many] = True
 
         for one in ("dim_state", "dim_customer", "dim_date"):
@@ -127,8 +147,8 @@ class Model:
             # BOTH: the filtered items filter fact_orders back to orders that contain
             # at least one visible item. An unfiltered table does not filter the
             # other side, so this only applies when something filters the items.
-            keep = self.t["fact_order_items"].loc[mask["fact_order_items"], "order_id"]
-            mask["fact_orders"] &= self.t["fact_orders"]["order_id"].isin(keep).to_numpy()
+            allowed = self._allowed("fact_orders", self.codes[("fact_orders", "many")][mask["fact_order_items"]])
+            mask["fact_orders"] &= allowed[self.codes[("fact_orders", "one")]]
             filtered["fact_orders"] = True
         push("fact_orders")                              # fact_orders -> fact_order_items
         return mask
@@ -155,9 +175,10 @@ class Measures:
     def fi(self, c: Ctx) -> pd.DataFrame:
         return self.m.rows("fact_order_items", c)
 
-    # Total Orders = COUNTROWS ( fact_orders )
+    # Total Orders = COUNTROWS ( fact_orders )   (COUNTROWS of an empty table is BLANK)
     def total_orders(self, c: Ctx) -> float:
-        return float(len(self.fo(c)))
+        n = len(self.fo(c))
+        return float(n) if n else math.nan
 
     # Delivered Orders = CALCULATE ( COUNTROWS ( fact_orders ), fact_orders[is_delivered] = 1 )
     def delivered_orders(self, c: Ctx) -> float:
@@ -213,14 +234,140 @@ class Measures:
     def low_review_pct_on_time(self, c: Ctx) -> float:
         return self.low_review_pct(c.calc(ON_TIME))
 
+    # ------------------------------------------------ report-page measures (Stage 3)
+    # Revenue Share = DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( dim_product ) ) )
+    def revenue_share(self, c: Ctx) -> float:
+        return divide(self.revenue(c), self.revenue(c.calc(All("dim_product"))))
+
+    @lru_cache(maxsize=None)
+    def _category_revenue(self, c: Ctx) -> pd.Series:
+        """ADDCOLUMNS ( ALL ( dim_product[category] ), "@rev", [Revenue] ) evaluated in c.
+        The measure reference is an implicit CALCULATE, so each category row becomes a
+        filter (context transition) that replaces the visual's category filter."""
+        base = c.calc(All("dim_product", ("category",)))
+        cats = sorted(self.m.t["dim_product"]["category"].unique())
+        return pd.Series({cat: self.revenue(base.calc(eq("dim_product", "category", cat))) for cat in cats})
+
+    # Category Rank = IF ( HASONEVALUE ( category ) && NOT ISBLANK ( [Revenue] ),
+    #                      RANKX ( ALL ( dim_product[category] ), [Revenue], , DESC, SKIP ) )
+    def category_rank(self, c: Ctx) -> float:
+        cur = self.revenue(c)
+        revs = self._category_revenue(c).dropna()          # BLANK ranks last in DESC order
+        return math.nan if math.isnan(cur) else float(1 + (revs > cur).sum())
+
+    # Cumulative Revenue % : SUMX over categories whose @rev >= current revenue, divided by
+    # SUMX over all. A BLANK @rev fails ">= _cur" (BLANK acts as 0) and SUMX skips it.
+    def cumulative_revenue_pct(self, c: Ctx) -> float:
+        cur = self.revenue(c)
+        if math.isnan(cur):
+            return math.nan
+        revs = self._category_revenue(c).dropna()
+        return divide(float(revs[revs >= cur].sum()), float(revs.sum()))
+
+    # Cumulative % of Categories = DIVIDE ( [Category Rank],
+    #     COUNTROWS ( FILTER ( ALL ( dim_product[category] ), NOT ISBLANK ( [Revenue] ) ) ) )
+    def cumulative_pct_of_categories(self, c: Ctx) -> float:
+        return divide(self.category_rank(c), float(self._category_revenue(c).notna().sum()))
+
+    # Revenue MoM % : previous month = DATEADD ( dim_date[date], -1, MONTH ). dim_date is a
+    # marked date table, so that filter also clears other dim_date filters (is_partial_edge).
+    # Blank unless the previous month has >= 500 delivered orders (sql/06 rule).
+    def revenue_mom_pct(self, month_start: pd.Timestamp) -> float:
+        prev_start = month_start - pd.DateOffset(months=1)
+        cur = Ctx().calc(eq("dim_date", "month_start", month_start.date()))
+        prev = Ctx().calc(eq("dim_date", "month_start", prev_start.date()))
+        prev_orders = self.delivered_orders(prev)
+        if not prev_orders >= 500:                       # BLANK >= 500 is FALSE
+            return math.nan
+        return divide(self.revenue(cur), self.revenue(prev)) - 1
+
+    # Orders (delay scope) = CALCULATE ( COUNTROWS ( fact_orders ), in_delay_scope = 1 )
+    def orders_delay_scope(self, c: Ctx) -> float:
+        return self.total_orders(c.calc(DELAY_SCOPE))
+
+    # Orders (review scope) = CALCULATE ( COUNTROWS ( fact_orders ), in_review_scope = 1 )
+    def orders_review_scope(self, c: Ctx) -> float:
+        return self.total_orders(c.calc(REVIEW_SCOPE))
+
+    # % of Orders (delay bucket) = DIVIDE ( [Orders (review scope)], CALCULATE (
+    #     [Orders (review scope)], ALL ( delay_bucket, delay_bucket_order ) ) )
+    def pct_of_orders_delay_bucket(self, c: Ctx) -> float:
+        all_buckets = All("fact_orders", ("delay_bucket", "delay_bucket_order"))
+        return divide(self.orders_review_scope(c), self.orders_review_scope(c.calc(all_buckets)))
+
+    # The (seller/category) measures wrap the order-level measure in
+    # CALCULATE ( ..., CROSSFILTER ( fact_order_items[order_id], fact_orders[order_id], BOTH ) )
+    def orders_items_filter(self, c: Ctx) -> float:
+        return self.orders_delay_scope(c.calc(BOTH))
+
+    def reviewed_orders_items_filter(self, c: Ctx) -> float:
+        return self.orders_review_scope(c.calc(BOTH))
+
+    def late_pct_items_filter(self, c: Ctx) -> float:
+        return self.late_pct(c.calc(BOTH))
+
+    def low_review_pct_items_filter(self, c: Ctx) -> float:
+        return self.low_review_pct(c.calc(BOTH))
+
+    # Freight % of Price = DIVIDE ( CALCULATE ( SUM ( fact_order_items[freight_value] ),
+    #     fact_orders[is_delivered] = 1 ), [Revenue] )
+    def freight_pct_of_price(self, c: Ctx) -> float:
+        return divide(float(self.fi(c.calc(DELIVERED))["freight_value"].sum()), self.revenue(c))
+
+    # Freight Gap On Time (pp) = ( CALCULATE ( [Low Review % (On time)], freight_bucket_order = 5 )
+    #     - CALCULATE ( [Low Review % (On time)], freight_bucket_order = 1 ) ) * 100
+    def freight_gap_on_time_pp(self, c: Ctx) -> float:
+        hi = self.low_review_pct_on_time(c.calc(eq("fact_orders", "freight_bucket_order", 5)))
+        lo = self.low_review_pct_on_time(c.calc(eq("fact_orders", "freight_bucket_order", 1)))
+        return (hi - lo) * 100
+
+    # Lateness Gap (pp) = ( [Low Review % (Late)] - [Low Review % (On time)] ) * 100
+    def lateness_gap_pp(self, c: Ctx) -> float:
+        return (self.low_review_pct_late(c) - self.low_review_pct_on_time(c)) * 100
+
+    # Late Orders (review scope) = CALCULATE ( [Orders (review scope)], is_late = 1 )
+    def late_orders_review_scope(self, c: Ctx) -> float:
+        return self.orders_review_scope(c.calc(LATE))
+
+    # Orders Rescued (what-if) = [Late Orders (review scope)] * [Late Cut % Value]
+    def orders_rescued(self, c: Ctx, cut: float) -> float:
+        return self.late_orders_review_scope(c) * cut
+
+    # Low Reviews Avoided (upper bound) = [Orders Rescued (what-if)]
+    #     * ( [Low Review % (Late)] - [Low Review % (On time)] )
+    def low_reviews_avoided(self, c: Ctx, cut: float) -> float:
+        return self.orders_rescued(c, cut) * (self.low_review_pct_late(c) - self.low_review_pct_on_time(c))
+
+    # Low Reviews Avoided % (upper bound) = DIVIDE ( [Low Reviews Avoided (upper bound)],
+    #     CALCULATE ( [Orders (review scope)], fact_orders[is_low_review] = 1 ) )
+    def low_reviews_avoided_pct(self, c: Ctx, cut: float) -> float:
+        low_now = self.orders_review_scope(c.calc(eq("fact_orders", "is_low_review", 1)))
+        return divide(self.low_reviews_avoided(c, cut), low_now)
+
+    # % of Customers (segment) = DIVIDE ( [Customers], CALCULATE ( [Customers], ALL ( dim_customer ) ) )
+    def pct_of_customers(self, c: Ctx) -> float:
+        return divide(self.customers(c), self.customers(c.calc(All("dim_customer"))))
+
+    # % of Revenue (segment) = DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( dim_customer ) ) )
+    def pct_of_revenue_segment(self, c: Ctx) -> float:
+        return divide(self.revenue(c), self.revenue(c.calc(All("dim_customer"))))
+
 
 # ---------------------------------------------------------------- checks
 RESULTS: list[dict] = []
+NOTES: dict[str, list[str]] = {}       # extra lines printed under a section's results
 
 
 def check(section: str, name: str, value: float, expected: float, tol: float, label: str) -> None:
-    """Record one comparison. tol is the largest allowed absolute difference."""
-    diff = abs(value - expected) if not (math.isnan(value) or math.isnan(expected)) else math.inf
+    """Record one comparison. tol is the largest allowed absolute difference.
+    Two BLANKs (nan) match, e.g. MoM growth after a sparse month (SQL NULL vs DAX BLANK)."""
+    value, expected = float(value), float(expected)
+    if math.isnan(value) and math.isnan(expected):
+        diff = 0.0
+    elif math.isnan(value) or math.isnan(expected):
+        diff = math.inf
+    else:
+        diff = abs(value - expected)
     RESULTS.append({"section": section, "check": name, "value": value, "expected": expected,
                     "diff": diff, "tol": tol, "status": "Match" if diff <= tol + 1e-9 else "MISMATCH",
                     "label": label})
@@ -294,6 +441,136 @@ def section_c_propagation(dax: Measures) -> None:
         check("C", f"Customers, {st}  [sql/05]", dax.customers(c), row.customers, 0, "LOGIC-CHECKED")
 
 
+HALF_2DP = 0.005 + 1e-6    # SQL values rounded to 2 dp can differ from the exact value by 0.005
+HALF_3DP = 0.0005 + 1e-6
+
+
+def section_d_report_pages(dax: Measures) -> None:
+    """Stage 3 measures, each sliced the way its report visual slices it, vs the SQL
+    file it mirrors (dashboard/data parquet, or recon_seller_state for sql/21)."""
+    L = "LOGIC-CHECKED"
+
+    # D1 Pareto by category (sql/03 -> pareto_category). Visual: axis dim_product[category].
+    for r in pd.read_parquet(DASH / "pareto_category.parquet").itertuples():
+        c = Ctx().calc(eq("dim_product", "category", r.category))
+        check("D1", f"{r.category}: Revenue", dax.revenue(c), r.revenue, HALF_2DP, L)
+        check("D1", f"{r.category}: Revenue Share", 100 * dax.revenue_share(c), r.pct_of_revenue, HALF_2DP, L)
+        check("D1", f"{r.category}: Category Rank", dax.category_rank(c), r.rank, 0, L)
+        check("D1", f"{r.category}: Cumulative Revenue %", 100 * dax.cumulative_revenue_pct(c), r.cumulative_pct, HALF_2DP, L)
+        check("D1", f"{r.category}: Cumulative % of Categories", 100 * dax.cumulative_pct_of_categories(c),
+              r.cumulative_pct_of_categories, HALF_2DP, L)
+
+    # D2 Monthly revenue and MoM growth (sql/06 -> monthly_trend). Axis dim_date[month_start].
+    for r in pd.read_parquet(DASH / "monthly_trend.parquet").itertuples():
+        m = pd.Timestamp(r.month)
+        c = Ctx().calc(eq("dim_date", "month_start", m.date()))
+        label = f"{m:%Y-%m}"
+        check("D2", f"{label}: Delivered Orders", dax.delivered_orders(c), r.orders, 0, L)
+        check("D2", f"{label}: Revenue", dax.revenue(c), r.revenue, HALF_2DP, L)
+        check("D2", f"{label}: AOV", dax.aov(c), r.avg_order_value, HALF_2DP, L)
+        check("D2", f"{label}: Revenue MoM %", 100 * dax.revenue_mom_pct(m), r.revenue_mom_pct, HALF_2DP, L)
+
+    # D3 Delay buckets (sql/11 -> delay_vs_review). Axis fact_orders[delay_bucket], which is
+    # sorted by delay_bucket_order, so Power BI filters both columns for each bar.
+    for r in pd.read_parquet(DASH / "delay_vs_review.parquet").itertuples():
+        c = Ctx().calc(eq("fact_orders", "delay_bucket", r.delay_bucket),
+                       eq("fact_orders", "delay_bucket_order", r.bucket_order))
+        b = r.delay_bucket
+        check("D3", f"{b}: Orders (review scope)", dax.orders_review_scope(c), r.orders, 0, L)
+        check("D3", f"{b}: % of Orders (delay bucket)", 100 * dax.pct_of_orders_delay_bucket(c), r.pct_of_orders, HALF_2DP, L)
+        check("D3", f"{b}: Low Review %", 100 * dax.low_review_pct(c), r.pct_low_review, HALF_2DP, L)
+        check("D3", f"{b}: Avg Review", dax.avg_review(c), r.avg_review, HALF_3DP, L)
+        check("D3", f"{b}: Late % (0 or 100 by construction)", 100 * dax.late_pct(c),
+              100.0 if r.bucket_order >= 5 else 0.0, 1e-9, L)
+
+    # D4 Customer state (sql/14 -> state_ops). Axis dim_state[state_code].
+    for r in pd.read_parquet(DASH / "state_ops.parquet").itertuples():
+        c = Ctx().calc(eq("dim_state", "state_code", r.customer_state))
+        s = r.customer_state
+        check("D4", f"{s}: Orders (delay scope)", dax.orders_delay_scope(c), r.orders, 0, L)
+        check("D4", f"{s}: Late %", 100 * dax.late_pct(c), r.late_pct, HALF_2DP, L)
+        check("D4", f"{s}: Low Review %", 100 * dax.low_review_pct(c), r.pct_low_review, HALF_2DP, L)
+
+    # D5 Seller state (sql/21 -> recon_seller_state). Axis dim_seller[seller_state]: the filter
+    # reaches fact_orders only through CROSSFILTER(..., BOTH) inside the measure.
+    for r in pd.read_parquet(PBI / "recon_seller_state.parquet").itertuples():
+        c = Ctx().calc(eq("dim_seller", "seller_state", r.seller_state))
+        s = r.seller_state
+        check("D5", f"{s}: Orders (seller/category)", dax.orders_items_filter(c), r.orders, 0, L)
+        check("D5", f"{s}: Reviewed Orders (seller/category)", dax.reviewed_orders_items_filter(c), r.reviewed_orders, 0, L)
+        check("D5", f"{s}: Late % (seller/category)", 100 * dax.late_pct_items_filter(c), r.late_pct, HALF_2DP, L)
+        check("D5", f"{s}: Low Review % (seller/category)", 100 * dax.low_review_pct_items_filter(c),
+              r.pct_low_review, HALF_2DP, L)
+
+    # D6 Category scorecard (sql/13 -> category_ops), the same CROSSFILTER pattern by category.
+    # Only columns whose scope matches the measures exactly: late % (delivered with a delivery
+    # date) and freight % of price (item level). sql/13's low-review % also counts the 8
+    # delivered orders without a delivery date, so it is not compared.
+    for r in pd.read_parquet(DASH / "category_ops.parquet").itertuples():
+        c = Ctx().calc(eq("dim_product", "category", r.category))
+        check("D6", f"{r.category}: Late % (seller/category)", 100 * dax.late_pct_items_filter(c), r.late_pct, HALF_2DP, L)
+        check("D6", f"{r.category}: Freight % of Price", 100 * dax.freight_pct_of_price(c),
+              r.freight_pct_of_price, HALF_2DP, L)
+
+    # D7 Freight share of price and the on-time-only test (sql/15 -> freight_vs_review).
+    # Axis fact_orders[freight_share_bucket], sorted by freight_bucket_order.
+    fr = pd.read_parquet(DASH / "freight_vs_review.parquet")
+    for r in fr.itertuples():
+        c = Ctx().calc(eq("fact_orders", "freight_share_bucket", r.freight_share_of_price),
+                       eq("fact_orders", "freight_bucket_order", r.bucket_order))
+        b = r.freight_share_of_price
+        check("D7", f"{b}: Orders (review scope)", dax.orders_review_scope(c), r.orders, 0, L)
+        check("D7", f"{b}: Low Review %", 100 * dax.low_review_pct(c), r.pct_low_review, HALF_2DP, L)
+        check("D7", f"{b}: Late % (reviewed)", 100 * dax.late_pct_reviewed(c), r.late_pct, HALF_2DP, L)
+        check("D7", f"{b}: Low Review % (On time)", 100 * dax.low_review_pct_on_time(c),
+              r.pct_low_review_on_time, HALF_2DP, L)
+    fr = fr.set_index("bucket_order")
+    lv = pd.read_parquet(DASH / "late_vs_ontime.parquet").set_index("delivery")
+    # Differences of two 2-dp values: each side can be off by 0.005.
+    check("D7", "Freight Gap On Time (pp)  [sql/15: 50%+ minus <10%]", dax.freight_gap_on_time_pp(Ctx()),
+          fr.loc[5, "pct_low_review_on_time"] - fr.loc[1, "pct_low_review_on_time"], 2 * HALF_2DP, L)
+    check("D7", "Lateness Gap (pp)  [sql/12: late minus on time]", dax.lateness_gap_pp(Ctx()),
+          lv.loc["Late", "pct_low_review"] - lv.loc["On time or early", "pct_low_review"], 2 * HALF_2DP, L)
+
+    # D8 What-if: cut late deliveries (Streamlit simulator, dashboard/app.py). Rates come
+    # from the Low Review % (Late) / (On time) measures, never typed. 3,190 and 1,696 are
+    # the expected values at 50% supplied for this check; the simulator's own formula is
+    # also recomputed from late_vs_ontime.parquet (it uses rates rounded to 2 dp).
+    late, ontime = lv.loc["Late"], lv.loc["On time or early"]
+    check("D8", "Late Orders (review scope)  [sql/12]", dax.late_orders_review_scope(Ctx()), late["orders"], 0, L)
+    for cut in (0.5, 1.0):
+        moved = late["orders"] * cut
+        low_now = (late["orders"] * late["pct_low_review"] + ontime["orders"] * ontime["pct_low_review"]) / 100
+        avoided = moved * (late["pct_low_review"] - ontime["pct_low_review"]) / 100
+        pct = f"{cut:.0%}"
+        rescued_dax, avoided_dax = dax.orders_rescued(Ctx(), cut), dax.low_reviews_avoided(Ctx(), cut)
+        check("D8", f"cut {pct}: Orders Rescued vs simulator formula", rescued_dax, moved, 1e-9, L)
+        check("D8", f"cut {pct}: Low Reviews Avoided vs simulator formula", avoided_dax, avoided, 1.0, L)
+        check("D8", f"cut {pct}: Low Reviews Avoided % vs simulator formula",
+              100 * dax.low_reviews_avoided_pct(Ctx(), cut), 100 * avoided / low_now, 0.05, L)
+        if cut == 0.5:
+            check("D8", "cut 50%: Orders Rescued vs expected 3,190 (+/-1)", rescued_dax, 3190, 1.0, L)
+            check("D8", "cut 50%: Low Reviews Avoided vs expected 1,696 (+/-1)", avoided_dax, 1696, 1.0, L)
+        NOTES.setdefault("D8", []).append(
+            f"cut {pct}: Power BI '#,0' would show {round_half_up(rescued_dax):,} rescued / "
+            f"{round_half_up(avoided_dax):,} fewer low reviews; Streamlit shows {moved:,.0f} / {avoided:,.0f} "
+            f"(exact DAX logic: {rescued_dax:,.2f} / {avoided_dax:,.2f})")
+
+    # D9 RFM segments (sql/09 -> rfm_segments). Axis dim_customer[segment].
+    for r in pd.read_parquet(DASH / "rfm_segments.parquet").itertuples():
+        c = Ctx().calc(eq("dim_customer", "segment", r.segment))
+        s = r.segment
+        check("D9", f"{s}: Customers", dax.customers(c), r.customers, 0, L)
+        check("D9", f"{s}: % of Customers (segment)", 100 * dax.pct_of_customers(c), r.pct_of_customers, HALF_2DP, L)
+        check("D9", f"{s}: Revenue", dax.revenue(c), r.revenue, HALF_2DP, L)
+        check("D9", f"{s}: % of Revenue (segment)", 100 * dax.pct_of_revenue_segment(c), r.pct_of_revenue, HALF_2DP, L)
+
+
+def round_half_up(x: float) -> int:
+    """Power BI's '#,0' format rounds halves away from zero; Python's format rounds to even."""
+    return int(math.floor(x + 0.5))
+
+
 def pitfall_demos(dax: Measures) -> None:
     """What the measures would return if written the naive way (informational)."""
     fo = dax.m.t["fact_orders"]
@@ -322,23 +599,49 @@ def pitfall_demos(dax: Measures) -> None:
     cat = eq("dim_product", "category", "office_furniture")
     print(f"  Direction       [Late %] for category office_furniture = {100 * dax.late_pct(Ctx().calc(cat)):.2f}% "
           f"(= national) vs {100 * dax.late_pct(Ctx().calc(cat, BOTH)):.2f}% with CROSSFILTER BOTH")
+    # 4. Sort-by-column. delay_bucket is sorted by delay_bucket_order, so each bar filters
+    #    both columns; ALL ( delay_bucket ) alone leaves the sort column filtered.
+    bar = Ctx().calc(eq("fact_orders", "delay_bucket", "1-3 days late"), eq("fact_orders", "delay_bucket_order", 5))
+    naive = divide(dax.orders_review_scope(bar),
+                   dax.orders_review_scope(bar.calc(All("fact_orders", ("delay_bucket",)))))
+    print(f"  Sort-by column  % of Orders for '1-3 days late' with ALL(delay_bucket) only = {100 * naive:.2f}% "
+          f"vs {100 * dax.pct_of_orders_delay_bucket(bar):.2f}% with ALL(delay_bucket, delay_bucket_order)")
+
+
+SECTION_TITLES = {
+    "A":  "A  SQL export (recon_sql) vs Streamlit build (dashboard/data)",
+    "B":  "B  Core DAX measures (pandas mirror) vs recon_sql",
+    "C":  "C  Relationship propagation: dim_state -> fact_orders -> fact_order_items  [sql/05]",
+    "D1": "D1 Revenue share and Pareto by category  [sql/03 -> pareto_category]",
+    "D2": "D2 Monthly revenue and MoM growth  [sql/06 -> monthly_trend]",
+    "D3": "D3 Delay buckets  [sql/11 -> delay_vs_review]",
+    "D4": "D4 Customer state  [sql/14 -> state_ops]",
+    "D5": "D5 Seller state via CROSSFILTER  [sql/21 -> recon_seller_state]",
+    "D6": "D6 Category via CROSSFILTER, freight % of price  [sql/13 -> category_ops]",
+    "D7": "D7 Freight share of price, on-time-only test  [sql/15 -> freight_vs_review]",
+    "D8": "D8 What-if: cut late deliveries  [dashboard/app.py simulator, sql/12]",
+    "D9": "D9 RFM segments  [sql/09 -> rfm_segments]",
+}
+SHOW_ALL_ROWS = {"A", "B", "D8"}       # other sections print a one-line summary when all match
 
 
 def report() -> bool:
     df = pd.DataFrame(RESULTS)
-    titles = {"A": "A  SQL export (recon_sql) vs Streamlit build (dashboard/data)",
-              "B": "B  Core DAX measures (pandas mirror) vs recon_sql",
-              "C": "C  Relationship propagation: dim_state -> fact_orders -> fact_order_items"}
-    with pd.option_context("display.width", 200, "display.max_colwidth", 60, "display.float_format", "{:,.6f}".format):
-        for sec, title in titles.items():
+    with pd.option_context("display.width", 220, "display.max_colwidth", 70, "display.float_format", "{:,.6f}".format):
+        for sec, title in SECTION_TITLES.items():
             part = df[df["section"] == sec]
             if part.empty:
                 continue
-            print(f"\n{title}  ({(part['status'] == 'Match').sum()}/{len(part)} match)")
-            if sec == "C" and (part["status"] == "Match").all():
-                print(f"  all {len(part)} state-level checks match (max diff {part['diff'].max():.6f})")
+            n_ok = int((part["status"] == "Match").sum())
+            print(f"\n{title}  ({n_ok}/{len(part)} match)")
+            if sec in SHOW_ALL_ROWS or n_ok < len(part):
+                rows = part if sec in SHOW_ALL_ROWS else part[part["status"] != "Match"]
+                print(rows[["check", "value", "expected", "diff", "tol", "status", "label"]].to_string(index=False))
             else:
-                print(part[["check", "value", "expected", "diff", "tol", "status", "label"]].to_string(index=False))
+                print(f"  all {len(part)} checks match; largest difference {part['diff'].max():.6f} "
+                      f"(label: {part['label'].iloc[0]})")
+            for note in NOTES.get(sec, []):
+                print(f"  {note}")
     bad = df[df["status"] != "Match"]
     print(f"\n{len(df) - len(bad)}/{len(df)} checks match.")
     if len(bad):
@@ -355,6 +658,7 @@ def main() -> int:
     section_a_sql_vs_dashboard(recon)
     section_b_core_measures(dax, recon)
     section_c_propagation(dax)
+    section_d_report_pages(dax)
     ok = report()
     pitfall_demos(dax)
     return 0 if ok else 1

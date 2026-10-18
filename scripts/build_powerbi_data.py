@@ -18,8 +18,13 @@ Tables
     dim_date          one row per calendar day
     recon_sql         headline numbers computed by the SQL layer, for the
                       Power BI reconciliation page (DAX vs SQL)
+    recon_seller_state  sql/21 output, the SQL reference for the seller-state measures
+    model_*, shap_*   Model page tables, copied unchanged from dashboard/data/
+                      (built by scripts/build_dashboard_data.py; nothing is retrained here)
 """
 
+import filecmp
+import shutil
 import sys
 from pathlib import Path
 
@@ -33,6 +38,11 @@ import pyarrow.parquet as pq  # noqa: E402
 from src import db  # noqa: E402
 
 OUT_DIR = ROOT / "powerbi" / "data"
+DASHBOARD_DIR = ROOT / "dashboard" / "data"
+
+# Model page: the Streamlit build's model outputs, copied byte for byte.
+MODEL_FILES = ["model_metrics", "model_capture_curve", "shap_importance",
+               "shap_state_effect", "model_curves", "model_target_comparison"]
 
 # Brazilian states: code -> (name, macro-region). Static reference data.
 STATES = {
@@ -98,7 +108,25 @@ SELECT
         WHEN delay_days <= 7   THEN 6
         WHEN delay_days <= 14  THEN 7
         ELSE                        8
-    END AS delay_bucket_order
+    END AS delay_bucket_order,
+    -- Freight bucket copied from sql/15_freight_ratio_vs_review.sql (order freight /
+    -- item value). NULL for orders without items, which sql/15 excludes.
+    CASE
+        WHEN items_value IS NULL OR items_value <= 0 THEN NULL
+        WHEN freight_value / items_value < 0.10 THEN '<10%'
+        WHEN freight_value / items_value < 0.20 THEN '10-20%'
+        WHEN freight_value / items_value < 0.35 THEN '20-35%'
+        WHEN freight_value / items_value < 0.50 THEN '35-50%'
+        ELSE                                         '50%+'
+    END AS freight_share_bucket,
+    CASE
+        WHEN items_value IS NULL OR items_value <= 0 THEN NULL
+        WHEN freight_value / items_value < 0.10 THEN 1
+        WHEN freight_value / items_value < 0.20 THEN 2
+        WHEN freight_value / items_value < 0.35 THEN 3
+        WHEN freight_value / items_value < 0.50 THEN 4
+        ELSE                                         5
+    END AS freight_bucket_order
 FROM orders_enriched
 ORDER BY order_id
 """
@@ -252,7 +280,21 @@ def run_checks(con, t: dict, kpi_revenue: float) -> bool:
     rev = float(fi.loc[fi["order_id"].isin(delivered_ids), "price"].sum())
     check("item prices on delivered orders = sql/10 revenue", abs(rev - kpi_revenue) < 0.01,
           f"{rev:,.2f} vs {kpi_revenue:,.2f}")
+    nested = ((fo["in_review_scope"] <= fo["in_delay_scope"]) & (fo["in_delay_scope"] <= fo["is_delivered"])).all()
+    check("scope flags nest: in_review_scope <= in_delay_scope <= is_delivered", nested)
+    for name in MODEL_FILES:
+        same = filecmp.cmp(DASHBOARD_DIR / f"{name}.parquet", OUT_DIR / f"{name}.parquet", shallow=False)
+        check(f"{name}.parquet is a byte-identical copy of dashboard/data", same)
     return ok
+
+
+def copy_model_files() -> None:
+    """Model page tables: copied unchanged from the Streamlit build (no retraining)."""
+    for name in MODEL_FILES:
+        src = DASHBOARD_DIR / f"{name}.parquet"
+        dst = shutil.copyfile(src, OUT_DIR / f"{name}.parquet")
+        rows = pq.read_metadata(dst).num_rows
+        print(f"  {dst.name:<26} {rows:>8,} rows  {dst.stat().st_size / 1024:8.1f} KB  (copied)")
 
 
 def main() -> int:
@@ -272,6 +314,8 @@ def main() -> int:
     purchase_dates = pd.to_datetime(t["fact_orders"]["purchase_date"])
     t["dim_date"] = save(build_dim_date(purchase_dates, monthly), "dim_date")
     recon = save(build_recon(con), "recon_sql")
+    save(db.query(con, "21_seller_state_ops.sql"), "recon_seller_state")
+    copy_model_files()
 
     print("\nIntegrity checks")
     kpi_revenue = float(recon.loc[recon["metric"] == "Revenue (R$)", "sql_value"].iloc[0])
