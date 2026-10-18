@@ -120,7 +120,7 @@ Deployment notes:
 - It reads **only** the small pre-aggregated parquet files in `dashboard/data/` (about 0.4 MB, built by `scripts/build_dashboard_data.py` from the same SQL and model code).
 - Because of that, it deploys to Streamlit Community Cloud without the raw data.
 - The theme lives in `.streamlit/config.toml`.
-- To rebuild the dashboard in Power BI, see [`docs/powerbi_notes.md`](docs/powerbi_notes.md).
+- A Power BI version of the analysis is described in the Power BI layer section below; build notes are in [`docs/powerbi_notes.md`](docs/powerbi_notes.md).
 
 ## Power BI layer
 
@@ -130,8 +130,9 @@ A Power BI semantic model on the same SQL definitions as the notebooks and the d
 - **Measures:** [`powerbi/dax_measures.md`](powerbi/dax_measures.md) holds KPIs, category Pareto, month-over-month growth, delay buckets, lateness by customer and seller state, the freight test, the late-delivery what-if (upper bound), RFM and the model page. Each names the SQL file it mirrors.
 - **Reconciliation:** `scripts/verify_powerbi_measures.py` re-implements each measure in pandas with the model's filter context and relationships, then compares it with SQL (all 905 measure checks match). A Reconciliation page in the report shows the 14 headline measures next to their SQL values.
 - **Model as code:** `scripts/build_powerbi_tmdl.py` generates the TMDL semantic model in `powerbi/CommerceLens.SemanticModel/`.
+- **Power BI report:** `powerbi/CommerceLens.pbip` (open in Power BI Desktop and set the DataFolder parameter first, see [`powerbi/README.md`](powerbi/README.md)). Five pages: Reconciliation (14/14 DAX vs SQL), Overview, Satisfaction drivers (late vs on-time reviews by delay bucket, what-if simulator), Revenue (top-15 categories, revenue by state, Pareto) and Customers & RFM. PDF export: [`docs/powerbi/CommerceLens.pdf`](docs/powerbi/CommerceLens.pdf). In the PDF the state slicer and the revenue-by-state chart are cut off (a PDF cannot scroll); the live report shows all states.
 
-Status: the export and SQL comparisons are verified. In Power BI Desktop the project opens, all tables load, and the 14 reconciliation measures reproduce the SQL values (14/14 Match). The what-if simulator (50% and 100% cuts), the category Pareto (rank 17 = 79.69% cumulative, matching SQL), the revenue-by-category and by-state rankings and the late/low-review-by-delay-bucket chart were also checked against SQL in Desktop. Other measures (month-on-month growth, seller-state, freight, seller tiers, model-page and colour measures) are logic-checked in pandas but have not been run in Desktop. The report has five pages (Reconciliation, Overview, Satisfaction drivers, Revenue, Customers & RFM); a PDF export is in docs/powerbi/CommerceLens.pdf. Risk model, Findings and lead-time pages are not built. The reconciliation tests the DAX layer against SQL (measure logic, relationships, filter propagation); it does not re-derive SQL inputs such as delay_days. Details: [`docs/powerbi_notes.md`](docs/powerbi_notes.md) (routes, reconciliation scope, why the late rate appears as 6.66%, 6.77% and 6.8%), [`docs/powerbi_requirements_map.md`](docs/powerbi_requirements_map.md), [`docs/powerbi_data_dictionary.md`](docs/powerbi_data_dictionary.md), [`docs/powerbi_build_checklist.md`](docs/powerbi_build_checklist.md). The Power BI scripts run in a separate Python 3.13 environment ([`powerbi/README.md`](powerbi/README.md)).
+Status: the export and SQL comparisons are verified. In Power BI Desktop the project opens, all tables load, and the 14 reconciliation measures reproduce the SQL values (14/14 Match). The what-if simulator (50% and 100% cuts), the category Pareto (rank 17 = 79.69% cumulative, matching SQL), the revenue-by-category and by-state rankings and the late/low-review-by-delay-bucket chart were also checked against SQL in Desktop. Other measures (month-on-month growth, seller-state, freight, seller tiers, model-page and colour measures) are logic-checked in pandas but have not been run in Desktop. The report has five pages (Reconciliation, Overview, Satisfaction drivers, Revenue, Customers & RFM); a PDF export is in [`docs/powerbi/CommerceLens.pdf`](docs/powerbi/CommerceLens.pdf). Risk model, Findings and lead-time pages are not built. The reconciliation tests the DAX layer against SQL (measure logic, relationships, filter propagation); it does not re-derive SQL inputs such as delay_days. Details: [`docs/powerbi_notes.md`](docs/powerbi_notes.md) (routes, reconciliation scope, why the late rate appears as 6.66%, 6.77% and 6.8%), [`docs/powerbi_requirements_map.md`](docs/powerbi_requirements_map.md), [`docs/powerbi_data_dictionary.md`](docs/powerbi_data_dictionary.md), [`docs/powerbi_build_checklist.md`](docs/powerbi_build_checklist.md). The Power BI scripts run in a separate Python 3.13 environment ([`powerbi/README.md`](powerbi/README.md)).
 
 ## Repository structure
 
@@ -151,14 +152,16 @@ dashboard/app.py               Streamlit app (+ slim requirements.txt for deploy
 scripts/build_powerbi_data.py      CSVs -> powerbi/data/*.parquet (star schema + integrity checks)
 scripts/verify_powerbi_measures.py pandas mirror of every DAX measure vs SQL
 scripts/build_powerbi_tmdl.py      TMDL semantic model from the parquet schemas + DAX file
-powerbi/                       DAX measures, TMDL model, theme, Python 3.13 env pins
+powerbi/                       CommerceLens.pbip project: CommerceLens.Report/ (report pages) and
+                               CommerceLens.SemanticModel/ (TMDL model); DAX measures, theme, Python 3.13 env pins
+docs/powerbi/CommerceLens.pdf  PDF export of the Power BI report
 docs/powerbi_notes.md          Power BI rebuild guide (routes, reconciliation scope, late-rate note)
 docs/powerbi_*.md              requirements map, data dictionary, build checklist
 ```
 
 ## Tech stack
 
-Python 3.11 · DuckDB (SQL) · pandas · LightGBM · scikit-learn · SHAP · SciPy · matplotlib · Plotly · Streamlit · Jupyter
+Python 3.11 · DuckDB (SQL) · pandas · LightGBM · scikit-learn · SHAP · SciPy · matplotlib · Plotly · Streamlit · Jupyter · Power BI (DAX, PBIP/TMDL)
 
 ## Setup & run
 
