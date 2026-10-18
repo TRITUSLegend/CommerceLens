@@ -4,10 +4,10 @@
   "position": {
     "x": 1242,
     "y": 44,
-    "z": 9,
+    "z": 9000,
     "height": 394,
     "width": 440,
-    "tabOrder": 9
+    "tabOrder": 9000
   },
   "visual": {
     "visualType": "slicer",
@@ -55,23 +55,5 @@
       ]
     },
     "drillFilterOtherVisuals": true
-  },
-  "filterConfig": {
-    "filters": [
-      {
-        "name": "df9c3859c171b3bbc2ce",
-        "field": {
-          "Column": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "dim_state"
-              }
-            },
-            "Property": "state_code"
-          }
-        },
-        "type": "Categorical"
-      }
-    ]
   }
 }

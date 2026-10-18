@@ -4,10 +4,10 @@
   "position": {
     "x": 748,
     "y": 44,
-    "z": 2,
+    "z": 2000,
     "height": 181.66666666666669,
     "width": 300,
-    "tabOrder": 2
+    "tabOrder": 2000
   },
   "visual": {
     "visualType": "cardVisual",
@@ -52,23 +52,5 @@
       }
     },
     "drillFilterOtherVisuals": true
-  },
-  "filterConfig": {
-    "filters": [
-      {
-        "name": "1fa2b60088f6c342039e",
-        "field": {
-          "Measure": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "_Measures"
-              }
-            },
-            "Property": "Customers"
-          }
-        },
-        "type": "Advanced"
-      }
-    ]
   }
 }
