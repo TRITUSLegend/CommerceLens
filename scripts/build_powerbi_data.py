@@ -184,7 +184,8 @@ def build_dim_date(purchase_dates: pd.Series, monthly: pd.DataFrame) -> pd.DataF
     # Same rule as sql/06: months with < 500 delivered orders are sparse dataset edges.
     edge = monthly.assign(month_start=pd.to_datetime(monthly["month"]))[["month_start", "is_partial_edge"]]
     d = d.merge(edge, on="month_start", how="left")
-    d["is_partial_edge"] = d["is_partial_edge"].fillna(True).astype(bool)
+    # Months with no delivered orders are missing from sql/06 and are edges too.
+    d["is_partial_edge"] = d["is_partial_edge"].astype("boolean").fillna(True).astype(bool)
     for col in ("date", "month_start"):
         d[col] = d[col].dt.date  # store as DATE, not TIMESTAMP
     return d
