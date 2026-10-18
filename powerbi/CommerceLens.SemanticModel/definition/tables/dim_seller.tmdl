@@ -19,6 +19,12 @@ table dim_seller
 		summarizeBy: none
 		sourceColumn: seller_city
 
+	column seller_tier
+		dataType: string
+		lineageTag: 524a919c-162c-5036-b6b5-4eb7eb47affa
+		summarizeBy: none
+		sourceColumn: seller_tier
+
 	partition dim_seller = m
 		mode: import
 		source =

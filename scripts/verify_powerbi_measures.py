@@ -16,7 +16,8 @@ Model.masks), then the results are compared with the SQL layer:
                                        delay buckets, D4 sql/14 customer state, D5 sql/21
                                        seller state, D6 sql/13 category, D7 sql/15 freight,
                                        D8 Streamlit what-if, D9 sql/09 RFM segments,
-                                       D10 Model page lookups on the copied model tables
+                                       D10 Model page lookups on the copied model tables,
+                                       D11 sql/17 seller tiers
 
 A pass in B, C or D means the measure's LOGIC (filters, scope flags, relationships)
 reproduces SQL. The DAX itself is not executed, so those measures are
@@ -345,6 +346,10 @@ class Measures:
         low_now = self.orders_review_scope(c.calc(eq("fact_orders", "is_low_review", 1)))
         return divide(self.low_reviews_avoided(c, cut), low_now)
 
+    # % of Revenue (seller) = DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( dim_seller ) ) )
+    def pct_of_revenue_seller(self, c: Ctx) -> float:
+        return divide(self.revenue(c), self.revenue(c.calc(All("dim_seller"))))
+
     # % of Customers (segment) = DIVIDE ( [Customers], CALCULATE ( [Customers], ALL ( dim_customer ) ) )
     def pct_of_customers(self, c: Ctx) -> float:
         return divide(self.customers(c), self.customers(c.calc(All("dim_customer"))))
@@ -557,6 +562,16 @@ def section_d_report_pages(dax: Measures) -> None:
             f"{round_half_up(avoided_dax):,} fewer low reviews; Streamlit shows {moved:,.0f} / {avoided:,.0f} "
             f"(exact DAX logic: {rescued_dax:,.2f} / {avoided_dax:,.2f})")
 
+    # D11 Seller tiers (sql/17 -> seller_tiers). Axis dim_seller[seller_tier]. Revenue reaches
+    # the items directly; late % needs the CROSSFILTER measure. sql/17's low-review % and
+    # order count include delivered orders without a delivery date, so they are not compared.
+    for r in pd.read_parquet(DASH / "seller_tiers.parquet").itertuples():
+        c = Ctx().calc(eq("dim_seller", "seller_tier", r.seller_tier))
+        t = r.seller_tier
+        check("D11", f"{t}: Revenue", dax.revenue(c), r.revenue, HALF_2DP, L)
+        check("D11", f"{t}: % of Revenue (seller)", 100 * dax.pct_of_revenue_seller(c), r.pct_of_revenue, HALF_2DP, L)
+        check("D11", f"{t}: Late % (seller/category)", 100 * dax.late_pct_items_filter(c), r.late_pct, HALF_2DP, L)
+
     # D9 RFM segments (sql/09 -> rfm_segments). Axis dim_customer[segment].
     for r in pd.read_parquet(DASH / "rfm_segments.parquet").itertuples():
         c = Ctx().calc(eq("dim_customer", "segment", r.segment))
@@ -642,6 +657,7 @@ SECTION_TITLES = {
     "D8": "D8 What-if: cut late deliveries  [dashboard/app.py simulator, sql/12]",
     "D9": "D9 RFM segments  [sql/09 -> rfm_segments]",
     "D10": "D10 Model page lookups  [copied model_* tables vs dashboard/data/model_capture]",
+    "D11": "D11 Seller tiers  [sql/17 -> seller_tiers]",
 }
 SHOW_ALL_ROWS = {"A", "B", "D8"}       # other sections print a one-line summary when all match
 
