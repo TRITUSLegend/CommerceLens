@@ -250,6 +250,11 @@ table _Measures
 		displayFolder: 4 Satisfaction
 		lineageTag: 16a67cd4-1ed7-5195-bb0b-024144faae13
 
+	measure '% of Revenue (seller)' = DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( dim_seller ) ) )
+		formatString: 0.00%
+		displayFolder: 4 Satisfaction
+		lineageTag: 3ee4f388-b29f-5625-a8b2-c0a1a81c6139
+
 	measure 'Freight % of Price' =
 			DIVIDE (
 			    CALCULATE ( SUM ( fact_order_items[freight_value] ), fact_orders[is_delivered] = 1 ),

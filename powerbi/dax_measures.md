@@ -280,6 +280,19 @@ CALCULATE ( [Low Review %], CROSSFILTER ( fact_order_items[order_id], fact_order
 have fewer than 30 orders (see `recon_seller_state`); add a visual-level filter
 `[Orders (seller/category)] >= 30` so tiny samples are not ranked.
 
+## Seller concentration (`sql/17_seller_tier_ops.sql`)
+
+`dim_seller[seller_tier]` is exported with the `sql/17` rule (top 20% of sellers by delivered
+revenue; "No delivered sales" for sellers without one).
+
+```dax
+% of Revenue (seller) =
+DIVIDE ( [Revenue], CALCULATE ( [Revenue], ALL ( dim_seller ) ) )
+```
+
+Visual: axis `dim_seller[seller_tier]`, measures `[Revenue]`, `[% of Revenue (seller)]` and
+`[Late % (seller/category)]` (an order counts for every tier among its sellers, as in `sql/17`).
+
 ## Freight test (`sql/15_freight_ratio_vs_review.sql`)
 
 ```dax

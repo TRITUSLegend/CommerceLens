@@ -148,10 +148,30 @@ LEFT JOIN category_translation t ON t.product_category_name = p.product_category
 ORDER BY p.product_id
 """
 
+# Seller tier copied from sql/17_seller_tier_ops.sql: top 20% of sellers by delivered
+# revenue. Sellers with no delivered sale have no tier in sql/17.
 DIM_SELLER_SQL = """
-SELECT seller_id, seller_state, seller_city
-FROM sellers
-ORDER BY seller_id
+WITH seller_rev AS (
+    SELECT seller_id, SUM(price) AS revenue
+    FROM order_items_enriched
+    WHERE order_status = 'delivered'
+    GROUP BY seller_id
+),
+tiers AS (
+    SELECT
+        seller_id,
+        CASE WHEN PERCENT_RANK() OVER (ORDER BY revenue DESC) < 0.20
+             THEN 'Top 20% sellers' ELSE 'Other 80% sellers' END AS seller_tier
+    FROM seller_rev
+)
+SELECT
+    s.seller_id,
+    s.seller_state,
+    s.seller_city,
+    COALESCE(t.seller_tier, 'No delivered sales') AS seller_tier
+FROM sellers s
+LEFT JOIN tiers t ON t.seller_id = s.seller_id
+ORDER BY s.seller_id
 """
 
 # Every real person, scored or not. Segment logic lives in sql/08_rfm_customers.sql.
