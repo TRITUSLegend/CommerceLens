@@ -1,0 +1,13 @@
+# Environment for the Power BI layer only (scripts/build_powerbi_data.py, scripts/verify_powerbi_measures.py).
+# Separate from the project's pinned requirements.txt (Python 3.11): this runs on Python 3.13,
+# where numpy==1.26.4 has no wheel, so NumPy resolves to 2.x. No model code runs in this env.
+#   py -3.13 -m venv .venv-powerbi
+#   .venv-powerbi\Scripts\python -m pip install -r powerbi/requirements-powerbi.txt
+duckdb==1.1.3
+numpy==2.5.4
+pandas==2.2.3
+pyarrow==18.1.0
+python-dateutil==2.9.0.post0
+pytz==2026.5
+six==1.17.0
+tzdata==2026.5
