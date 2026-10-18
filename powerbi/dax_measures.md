@@ -350,6 +350,30 @@ computes 3,190.50 orders rescued and 1,695.83 fewer low reviews; Streamlit shows
 Power BI's `#,0` format is expected to round the half order up and show 3,191. That is
 **unconfirmed** until the card is seen in Desktop. Label both cards "upper bound".
 
+## Formatting helpers (colour rules; formatting only, not reconciled)
+
+Use with **Format > Columns (or Bars) > Colors > fx > Format style: Field value**. Orange marks
+late or above-average values only; everything else stays blue. The theme
+(`powerbi/CommerceLens-theme.json`) keeps orange out of the default series colours.
+
+```dax
+Delay Bucket Color =
+IF ( MAX ( fact_orders[delay_bucket_order] ) >= 5, "#eb6834", "#2a78d6" )
+
+Late % Color (state) =
+IF ( [Late %] > CALCULATE ( [Late %], ALL ( dim_state ) ), "#eb6834", "#2a78d6" )
+
+Late % Color (seller state) =
+IF ( [Late % (seller/category)] > CALCULATE ( [Late %], ALL ( dim_seller ) ), "#eb6834", "#2a78d6" )
+
+Low Review Color (category) =
+IF (
+    [Low Review % (seller/category)] > CALCULATE ( [Low Review %], ALL ( dim_product ) ),
+    "#eb6834",
+    "#2a78d6"
+)
+```
+
 ## Customers & RFM page (`sql/09_rfm_segments.sql`)
 
 ```dax

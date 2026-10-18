@@ -310,6 +310,27 @@ table _Measures
 		displayFolder: 6 What-if
 		lineageTag: aae19705-2cca-513d-8847-07df6307d255
 
+	measure 'Delay Bucket Color' = IF ( MAX ( fact_orders[delay_bucket_order] ) >= 5, "#eb6834", "#2a78d6" )
+		displayFolder: 9 Formatting
+		lineageTag: 9e230ebc-7625-5ae5-93a5-ce0942c5f180
+
+	measure 'Late % Color (state)' = IF ( [Late %] > CALCULATE ( [Late %], ALL ( dim_state ) ), "#eb6834", "#2a78d6" )
+		displayFolder: 9 Formatting
+		lineageTag: fcecb236-1a7d-5709-98ba-d8b7399db8b0
+
+	measure 'Late % Color (seller state)' = IF ( [Late % (seller/category)] > CALCULATE ( [Late %], ALL ( dim_seller ) ), "#eb6834", "#2a78d6" )
+		displayFolder: 9 Formatting
+		lineageTag: a270f360-5bf7-527f-858c-4c8856a36221
+
+	measure 'Low Review Color (category)' =
+			IF (
+			    [Low Review % (seller/category)] > CALCULATE ( [Low Review %], ALL ( dim_product ) ),
+			    "#eb6834",
+			    "#2a78d6"
+			)
+		displayFolder: 9 Formatting
+		lineageTag: 5ab8c16d-f0fb-5684-b20c-443235a6dd4a
+
 	measure '% of Customers (segment)' = DIVIDE ( [Customers], CALCULATE ( [Customers], ALL ( dim_customer ) ) )
 		formatString: 0.00%
 		displayFolder: 7 Customers
